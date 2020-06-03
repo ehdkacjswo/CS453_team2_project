@@ -1,0 +1,6 @@
+1. Place selection, crossover, mutaion on other files for future extension
+2. main.py
+	175 ~ 177: get dimension for MLP and define it
+	239 ~ 240: input, output list for MLP
+		EX) dnn_inp = [[1, 2, 3], [3, 2, 1]]
+			dnn_fit = [1, 2]

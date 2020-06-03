@@ -7,7 +7,7 @@ class MLP(nn.Module):
 		self.layer1 = nn.Linear(input_dim, 100)
 		self.layer2 = nn.Linear(100, 100)
 		self.layer3 = nn.Linear(100, 100)
-		self.layer4 = nn.Linaer(100, 1)
+		self.layer4 = nn.Linear(100, 1)
 
 	def forward(self, x):
 		z = self.layer1(x)

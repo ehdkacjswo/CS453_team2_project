@@ -2,17 +2,22 @@ import ast, astor
 import sys, os, copy, math, argparse, imp, importlib
 import random as rand
 from ast_helper import find_num, find_if, name_len, branch
-from ga_helper import mutate, in_test, add_test
 
+from ga.ga_helper import in_test, add_test
+from ga.selection import save_sel
+from ga.crossover import doam_cross
+from ga.mutation import doam_mut
 
 from dnn.model import MLP
 from dnn.nn_train import guided_mutation, train_one_iter
+import torch
 import torch.optim as optim
+
 # Generarte input from function ast
 def gen_input(func):
 	rt = []
 	arg_num = len(func.args.args)
-	special = list(set(find_num(func.body) + [0, 1, -1]))
+	special = list(set(find_num(func.body) + [0.0, 1.0, -1.0]))
 	
 	while len(rt) < p:
 		inp = []
@@ -21,7 +26,7 @@ def gen_input(func):
 			if rand.random() <= 0.2:
 				inp.append(rand.choice(special))
 			else:
-				inp.append(rand.randint(-100, 100))
+				inp.append(rand.uniform(-100, 100))
 		
 		rt = add_test(rt, inp)
 
@@ -40,7 +45,7 @@ def get_result(leaf_index):
 	br_dict = {}
 
 	for data in br_data:
-		br_id, br_type, br_dist = [int(x) for x in data.split(" ")]
+		br_id, br_type, br_dist = [float(x) for x in data.split(" ")]
 		
 		# When branch is passed, make fitness negative(-1)
 		if (br_type == 0 and br_dist <= 0) or (br_type == 1 and br_dist < 0):
@@ -107,6 +112,7 @@ def test_main(root_copy, body_ind, func_file_name):
 	print('Function found ({})\n'.format(func_name))
 	func.name = new_func_name
 
+	# Needs no argument
 	if not func.args.args:
 		return 
 
@@ -164,6 +170,11 @@ def test_main(root_copy, body_ind, func_file_name):
 	
 	# Used for final printing
 	leaf_index_copy = copy.deepcopy(leaf_index)
+
+	# DNN init
+	input_dim = len(func.args.args) + len(leaf_index)
+	mlp = MLP(input_dim)
+	one_hot = list(leaf_index.keys())
 	
 	# Branch fitness output with(test, output)
 	output = {}
@@ -192,14 +203,19 @@ def test_main(root_copy, body_ind, func_file_name):
 			print('{}0% generation processed'.format(mid_gen[i]))
 
 		new_output = []
+		# Input and fitness for dnn
+		dnn_inp = []
+		dnn_fit = []
 
+		# Test each inputs
 		for inp in new_test:
+			# Don't print anything
 			with HiddenPrint():
 				with open(br_file, 'w') as br_report:
 					try:
 						method(br_report, *inp)
 					except:
-						#Do nothing
+						# Exception detected, do nothing
 						i = i
 
 			new_output.append((inp, get_result(leaf_index)))
@@ -219,6 +235,10 @@ def test_main(root_copy, body_ind, func_file_name):
 			if sol_found:
 				break
 
+			for leaf_ind in leaf_index:
+				dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
+				dnn_fit.append(new_output[-1][1][leaf_ind])
+
 		# Solution found or last generation
 		if sol_found or i == gen - 1:
 			break
@@ -227,55 +247,13 @@ def test_main(root_copy, body_ind, func_file_name):
 		last_test_num = 0
 
 		for leaf_ind in leaf_index:
-			# Selct next generation saving some of current population
-			output[leaf_ind].extend(new_output)
-			output[leaf_ind] = output[leaf_ind][:save_p] + sorted(output[leaf_ind][save_p:], key=lambda data: data[1][leaf_ind])[:p - save_p]
-			output[leaf_ind] = sorted(output[leaf_ind], key=lambda data: data[1][leaf_ind])
+			save_sel(output, new_output, leaf_ind, p, save_p)
 
 			# Generate test case until p tests
 			while len(new_test) - last_test_num < p:
-				pair = []
+				children = doam_cross(output[leaf_ind], leaf_ind, special, pm, alpha, beta)
 					
-				# Binary tournament selection
-				for k in range(2):
-					p1 = rand.choice(output[leaf_ind])
-					p2 = rand.choice(output[leaf_ind])
-
-					if p1[1][leaf_ind] < p2[1][leaf_ind]:
-						pair.append(p1)
-					elif p1[1][leaf_ind] > p2[1][leaf_ind]:
-						pair.append(p2)
-					else:
-						pair.append(rand.choice([p1, p2]))
-
-				if pair[0][0] == pair[1][0]:
-					continue
-
-				score1 = pair[0][1][leaf_ind]
-				score2 = pair[1][1][leaf_ind]
-
-				children = []
-
-				# Single point crossover
-				if len(pair[0][0]) > 1:
-					cross_point = rand.randint(1, len(pair[0][0]) - 1)
-
-					children.append(pair[0][0][:cross_point] + pair[1][0][cross_point:])
-					children.append(pair[1][0][:cross_point] + pair[0][0][cross_point:])
-
-				# If single point crossover is unvailable, mutate
-				else:
-					children.append(mutate(pair[0][0], special, 1.0, alpha, beta))
-					children.append(mutate(pair[1][0], special, 1.0, alpha, beta))
-			
-				# Secant method
-				if score1 != score2:
-					children.append([int(math.ceil((pair[0][0][k] * (score2 + 1) - pair[1][0][k] * (score1 + 1)) / (score2 - score1))) for k in range(len(pair[0][0]))])
-
 				for child in children:
-					if rand.random() < 0.2 or child == pair[0][0] or child == pair[1][0]:
-						child = mutate(child, special, pm, alpha, beta)
-
 					if not in_test([out[0] for out in output[leaf_ind]], child):
 						new_test = add_test(new_test, child)
 
