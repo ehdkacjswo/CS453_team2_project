@@ -4,6 +4,10 @@ import random as rand
 from ast_helper import find_num, find_if, name_len, branch
 from ga_helper import mutate, in_test, add_test
 
+
+from dnn.model import MLP
+from dnn.nn_train import guided_mutation, train_one_iter
+import torch.optim as optim
 # Generarte input from function ast
 def gen_input(func):
 	rt = []
@@ -330,6 +334,14 @@ if __name__ == "__main__":
 	parser.add_argument('-f', '--func', type=str, help='Name of revised python file', default='branch_dist_print')
 	parser.add_argument('-br', '--br', type=str, help='Name of branch distance file', default='br_dist')
 
+	# Arguments for our deep learning framework
+	parser.add_argument('--niter', type=int, help="Number of iteration to be optimized", default=10000)
+	parser.add_argument('--lr', type=float, help="Learning for optimizer", default=1e-2)
+	parser.add_argument('--no_cuda', action='store_true', default=False, help='disables CUDA training')
+	parser.add_argument('--step_size',type=float, help="Step size for guided gradient descent", default=0.1)
+	parser.add_argument('--seed', type=int, help='random seed', default=2)
+	parser.add_argument('--model-dir', help="model save directory", default='./ckpt')
+
 	args = parser.parse_args()
 	root = astor.code_to_ast.parse_file(args.py_file)
 	
@@ -338,6 +350,14 @@ if __name__ == "__main__":
 	file_name = 'f' * var_len
 	temp_name = 't' * var_len
 	new_func_name = 'f' * (var_len + 1)
+
+	# NN setting
+	use_cuda = not args.no_cuda and torch.cuda.is_available()
+	device = torch.device("cuda" if use_cuda else "cpu")
+
+	model = MLP(var_len).to(device)
+	optimizer = optim.SGD(model.parameters(), lr=args.lr)
+
 
 	# Size of population
 	p = args.p if args.p > 0 else 100
