@@ -16,5 +16,6 @@ doam.lee: Modified main.py test control
 Now it can be called from other file with 'test_file' function.
 It takes file name as input, and returns [[# generation used, # total branch, # branch passed, time used], ...]
 for every functions detected in given file
+EX) [[1, 2, 2, 0.123421], [3, 3, 2, 0.213421]]
 
 TODO: add gradient support on crossover, control of global variables (# of gen, etc...)
