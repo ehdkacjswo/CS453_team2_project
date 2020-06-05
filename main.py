@@ -101,6 +101,13 @@ class HiddenPrint:
 def tf_br(ind):
 	return '{}{}'.format(abs(ind), 'T' if ind > 0 else 'F')
 
+# Get input dim
+def get_input_dim(func):
+	###### need to be implemented ######
+	###### get input dim of func. ######
+
+	return 1
+
 # Main part tests, evolves test cases
 def test_main(root_copy, body_ind, func_file_name):
 	func = root_copy.body[body_ind]
@@ -333,10 +340,6 @@ if __name__ == "__main__":
 	use_cuda = not args.no_cuda and torch.cuda.is_available()
 	device = torch.device("cuda" if use_cuda else "cpu")
 
-	model = MLP(var_len).to(device)
-	optimizer = optim.SGD(model.parameters(), lr=args.lr)
-
-
 	# Size of population
 	p = args.p if args.p > 0 else 100
 	save_p = int(math.floor(float(p) * (args.ps if args.ps in range(0, 51) else 10) / 100))
@@ -353,6 +356,9 @@ if __name__ == "__main__":
 	# File names
 	func_file = args.func
 	br_file = args.br
+	input_dim = get_input_dim(func_file)
 
 	for ind in range(len(root.body)):
+		model = MLP(input_dim + var_len).to(device)
+		optimizer = optim.SGD(model.parameters(), lr=args.lr)
 		test = test_main(copy.deepcopy(root), ind, func_file + str(ind) + '.py')

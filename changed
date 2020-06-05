@@ -4,3 +4,7 @@
 	239 ~ 240: input, output list for MLP
 		EX) dnn_inp = [[1, 2, 3], [3, 2, 1]]
 			dnn_fit = [1, 2]
+
+==========================
+sihyun.yu: Modified Guided Mutation function in nn_train.py
+now it takes additional argument (which is the dimension of test case) and do not update about one-hot vector

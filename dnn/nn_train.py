@@ -3,11 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-def guided_mutation(args, model, inputs):
+def guided_mutation(args, model, inputs, tc_dim):
 	inputs_var = torch.Tensor(inputs).to(device)
 	fitness = model(inputs_var)
 	grad = torch.autograd.grad(fitness, inputs_var)[0]
 	mutated_input = inputs_var.detach() + args.step_size * torch.sign(grad.detach())
+	mutated_input[:, tc_dim:] = inputs_var[:, tc_dim:] 
 
 	return mutated_input
 
