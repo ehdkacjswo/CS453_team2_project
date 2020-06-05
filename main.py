@@ -103,10 +103,7 @@ def tf_br(ind):
 
 # Get input dim
 def get_input_dim(func):
-	###### need to be implemented ######
-	###### get input dim of func. ######
-
-	return 1
+	return len(func.args.args)
 
 # Main part tests, evolves test cases
 def test_main(root_copy, body_ind, func_file_name):
