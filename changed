@@ -8,3 +8,5 @@
 ==========================
 sihyun.yu: Modified Guided Mutation function in nn_train.py
 now it takes additional argument (which is the dimension of test case) and do not update about one-hot vector
+
+TODO: main.py line 105 (get_input_dim)
