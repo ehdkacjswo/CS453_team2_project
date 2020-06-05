@@ -10,3 +10,11 @@ sihyun.yu: Modified Guided Mutation function in nn_train.py
 now it takes additional argument (which is the dimension of test case) and do not update about one-hot vector
 
 TODO: main.py line 105 (get_input_dim) -> resolved
+
+==========================
+doam.lee: Modified main.py test control
+Now it can be called from other file with 'test_file' function.
+It takes file name as input, and returns [[# generation used, # total branch, # branch passed, time used], ...]
+for every functions detected in given file
+
+TODO: add gradient support on crossover, control of global variables (# of gen, etc...)

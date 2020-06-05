@@ -1,7 +1,7 @@
 import random as rand
 from ga.mutation import doam_mut
 
-def doam_cross(output, leaf_ind, special, pm, alpha, beta):
+def doam_cross(output, leaf_ind, special, pm, sigma):
 	pair = []
 	
 	# Binary tournament selection
@@ -17,7 +17,7 @@ def doam_cross(output, leaf_ind, special, pm, alpha, beta):
 			pair.append(rand.choice([p1, p2]))
 
 	if pair[0][0] == pair[1][0]:
-		return doam_cross(output, leaf_ind, special, pm, alpha, beta)
+		return doam_cross(output, leaf_ind, special, pm, sigma)
 
 	score1 = pair[0][1][leaf_ind]
 	score2 = pair[1][1][leaf_ind]
@@ -33,8 +33,8 @@ def doam_cross(output, leaf_ind, special, pm, alpha, beta):
 
 	# If single point crossover is unvailable, mutate
 	else:
-		children.append(doam_mut(pair[0][0], special, 1.0, alpha, beta))
-		children.append(doam_mut(pair[1][0], special, 1.0, alpha, beta))
+		children.append(doam_mut(pair[0][0], special, 1.0, sigma))
+		children.append(doam_mut(pair[1][0], special, 1.0, sigma))
 			
 	# Secant method
 	if score1 != score2:
@@ -42,7 +42,7 @@ def doam_cross(output, leaf_ind, special, pm, alpha, beta):
 	
 	for child in children:
 		if rand.random() < pm or child == pair[0][0] or child == pair[1][0]:
-			child = doam_mut(child, special, pm, alpha, beta)
+			child = doam_mut(child, special, pm, sigma)
 
 	return children
 

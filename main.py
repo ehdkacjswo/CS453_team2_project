@@ -1,5 +1,5 @@
 import ast, astor
-import sys, os, copy, math, argparse, imp, importlib
+import sys, os, copy, math, argparse, imp, importlib, time
 import random as rand
 from ast_helper import find_num, find_if, name_len, branch
 
@@ -106,7 +106,7 @@ def get_input_dim(func):
 	return len(func.args.args)
 
 # Main part tests, evolves test cases
-def test_main(root_copy, body_ind, func_file_name):
+def test_func(root_copy, body_ind, test_file_name, func_file_name):
 	func = root_copy.body[body_ind]
 
 	if not isinstance(func, ast.FunctionDef):
@@ -137,7 +137,7 @@ def test_main(root_copy, body_ind, func_file_name):
 
 	# Change function name and Import original function
 	func.name = new_func_name
-	root_copy.body.insert(0, ast.ImportFrom(module=sys.argv[1][:-3], names=[ast.alias(name=func_name, asname=None)], level=0))
+	root_copy.body.insert(0, ast.ImportFrom(module=test_file_name[:-3], names=[ast.alias(name=func_name, asname=None)], level=0))
 	func.args.args.insert(0, ast.Name(id=file_name))
 
 	# Write changed code on new file
@@ -176,8 +176,9 @@ def test_main(root_copy, body_ind, func_file_name):
 	leaf_index_copy = copy.deepcopy(leaf_index)
 
 	# DNN init
-	input_dim = len(func.args.args) + len(leaf_index)
-	mlp = MLP(input_dim)
+	input_dim = len(func.args.args)
+	model = MLP(input_dim + len(leaf_index)).to(device)
+	optimizer = optim.SGD(model.parameters(), lr=lr)
 	one_hot = list(leaf_index.keys())
 	
 	# Branch fitness output with(test, output)
@@ -201,10 +202,13 @@ def test_main(root_copy, body_ind, func_file_name):
 	sol_found = False
 
 	mid_gen = {int(math.floor(gen * i * 0.1)): i for i in range(1, 11)}
+	# Return value (gen, # of br, # of br passed)
+	rt = []
 
 	for i in range(gen):
-		if i in mid_gen:
-			print('{}0% generation processed'.format(mid_gen[i]))
+		print(i, leaf_index.keys())
+		'''if i in mid_gen:
+			print('{}0% generation processed'.format(mid_gen[i]))'''
 
 		new_output = []
 		# Input and fitness for dnn
@@ -232,7 +236,7 @@ def test_main(root_copy, body_ind, func_file_name):
 					del leaf_index[leaf_ind]
 					
 					if not bool(leaf_index):
-						print('Every tests ares found!\n')
+						'''print('Every tests ares found!\n')'''
 						sol_found = True
 					break
 
@@ -245,26 +249,28 @@ def test_main(root_copy, body_ind, func_file_name):
 
 		# Solution found or last generation
 		if sol_found or i == gen - 1:
+			rt.append(i + 1)
 			break
 		
 		new_test = []
 		last_test_num = 0
+
+		train_one_iter(model, optimizer, dnn_inp, dnn_fit, 1000, device)
 
 		for leaf_ind in leaf_index:
 			save_sel(output, new_output, leaf_ind, p, save_p)
 
 			# Generate test case until p tests
 			while len(new_test) - last_test_num < p:
-				children = doam_cross(output[leaf_ind], leaf_ind, special, pm, alpha, beta)
-					
+				children = doam_cross(output[leaf_ind], leaf_ind, special, pm, sigma)
 				for child in children:
 					if not in_test([out[0] for out in output[leaf_ind]], child):
 						new_test = add_test(new_test, child)
 
 			last_test_num = len(new_test)
+
 	
 	node_test = {}
-
 	for leaf_ind, lvl_dict in leaf_index_copy.items():
 		# Solution found for leaf
 		if leaf_ind in leaf_test:
@@ -280,7 +286,10 @@ def test_main(root_copy, body_ind, func_file_name):
 				if lvl >= best_lvl:
 					node_test[parent] = test
 	
-	for ind in range(1, len(branch.br_list)):
+	rt.append(2 * (len(branch.br_list) - 1))
+	rt.append(len(node_test))
+	
+	'''for ind in range(1, len(branch.br_list)):
 		tf = [ind, -ind]
 
 		for br in tf:
@@ -291,7 +300,7 @@ def test_main(root_copy, body_ind, func_file_name):
 			else:
 				print('{}: -'.format(tf_br(br)))
 
-	print('\n')
+	print('\n')'''
 
 	# Delete trashes
 	del module
@@ -302,7 +311,57 @@ def test_main(root_copy, body_ind, func_file_name):
 	if os.path.exists(br_file):
 		os.remove(br_file)
 
-	return
+	return rt
+
+def test_file(test_file_name):
+	root = astor.code_to_ast.parse_file(test_file_name)
+	print(astor.dump_tree(root))
+	
+	# Generate unused variable name to avoid shadowing
+	var_len = name_len(root.body) + 1
+
+	global file_name
+	global temp_name
+	global new_func_name
+
+	file_name = 'f' * var_len
+	temp_name = 't' * var_len
+	new_func_name = 'f' * (var_len + 1)
+
+	rt = []
+
+	# Test for each functions
+	for ind in range(len(root.body)):
+		if isinstance(root.body[ind], ast.FunctionDef):
+			time_start = time.time()
+			rt.append(test_func(copy.deepcopy(root), ind, test_file_name, func_file + str(ind) + '.py'))
+			rt[-1].append(time.time() - time_start)
+
+	# [generation, total branch, passed branch, time]
+	return rt
+			
+
+# Global variables
+p = 100
+save_p = 10
+gen = 1000
+pm = 0.2
+sigma = 5
+
+func_file = 'branch_dist_print'
+br_file = 'br_dist'
+
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
+
+niter = 10000
+lr = 1e-2
+no_cuda = False
+step_size = 0.1
+seed = 2
+model_dir = '.ckpt'
+
+
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
@@ -325,6 +384,8 @@ if __name__ == "__main__":
 	parser.add_argument('--model-dir', help="model save directory", default='./ckpt')
 
 	args = parser.parse_args()
+	print(test_file(args.py_file))
+	'''
 	root = astor.code_to_ast.parse_file(args.py_file)
 	
 	# Apply not used variable name for output file and temp var
@@ -358,4 +419,4 @@ if __name__ == "__main__":
 	for ind in range(len(root.body)):
 		model = MLP(input_dim + var_len).to(device)
 		optimizer = optim.SGD(model.parameters(), lr=args.lr)
-		test = test_main(copy.deepcopy(root), ind, func_file + str(ind) + '.py')
+		test = test_main(copy.deepcopy(root), ind, func_file + str(ind) + '.py')'''

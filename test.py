@@ -1,6 +1,3 @@
-def same(a):
-	a[0] = 1
+from main import test_file
 
-a = [2, 2, 3]
-same(a)
-print(a)
+test_file('function.py')
