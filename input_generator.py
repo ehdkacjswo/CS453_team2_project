@@ -201,8 +201,8 @@ class InputGenerator:
 		leaf_index_copy = copy.deepcopy(leaf_index)
 
 		# DNN init
-		input_dim = len(func.args.args)
-		model = MLP(input_dim + len(leaf_index) - 1).to(self.device)
+		input_dim = len(func.args.args) - 1
+		model = MLP(input_dim + len(leaf_index)).to(self.device)
 		optimizer = optim.SGD(model.parameters(), lr=self.lr)
 		one_hot = list(leaf_index.keys())
 		
