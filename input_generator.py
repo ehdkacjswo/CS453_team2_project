@@ -33,22 +33,23 @@ class InputGenerator:
 		self.seed = seed
 		self.model_dir = model_dir
 
-		self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size)
+		self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size, True)
 	
 	# Class contains arguments for other functions
 	class Args:
-		def __init__(self, pm, alpha, beta, device, step_size):
+		def __init__(self, pm, alpha, beta, device, step_size, use_dnn):
 			self.pm = pm
 			self.alpha = alpha
 			self.beta = beta
 			self.device = device
 			self.step_size = step_size
+			self.use_dnn = use_dnn
 
 	# Generarte input from function ast
 	def gen_input(self, func):
 		rt = []
 		arg_num = len(func.args.args)
-		special = list(set(find_num(func.body) + [0.0, 1.0, -1.0]))
+		special = list(set(find_num(func.body) + [0, 1, -1]))
 		
 		while len(rt) < self.p:
 			inp = []
@@ -60,8 +61,6 @@ class InputGenerator:
 					inp.append(rand.randint(-100, 100))
 			
 			rt = add_test(rt, inp)
-
-		print(special)
 
 		return special, rt
 
@@ -199,16 +198,11 @@ class InputGenerator:
 		leaf_index_copy = copy.deepcopy(leaf_index)
 
 		# DNN init
-<<<<<<< HEAD
-		self.args.input_dim = len(func.args.args) - 1
-		self.args.model = MLP(self.args.input_dim + len(leaf_index)).to(self.args.device)
-		self.args.optimizer = optim.SGD(self.args.model.parameters(), lr=self.lr)
-=======
-		input_dim = len(func.args.args) - 1
-		model = MLP(input_dim + len(leaf_index)).to(self.device)
-		optimizer = optim.SGD(model.parameters(), lr=self.lr)
->>>>>>> e25d03f0dd842070df133b02727e145e8eb9daa6
-		one_hot = list(leaf_index.keys())
+		if self.args.use_dnn:
+			self.args.input_dim = len(func.args.args) - 1
+			self.args.model = MLP(self.args.input_dim + len(leaf_index)).to(self.args.device)
+			self.args.optimizer = optim.SGD(self.args.model.parameters(), lr=self.lr)
+			one_hot = list(leaf_index.keys())
 		
 		# Branch fitness output with(test, output)
 		output = {}
@@ -261,26 +255,32 @@ class InputGenerator:
 				if sol_found:
 					break
 
-				for leaf_ind in leaf_index:
-					dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
-					dnn_fit.append(new_output[-1][1][leaf_ind])
+				if self.args.use_dnn:
+					for leaf_ind in leaf_index:
+						dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
+						dnn_fit.append(new_output[-1][1][leaf_ind])
 
 			# Solution found or last generation
 			if sol_found or i == self.gen - 1:
 				rt.append(i + 1)
 				break
-			
+
 			new_test = []
 			last_test_num = 0
 			pop_per_leaf = (self.p + len(leaf_index) - 1) / len(leaf_index)
-			train_one_iter(dnn_inp, dnn_fit, self.args)
+			
+			'''for j in range(self.niter):'''
+			if self.args.use_dnn:
+				for j in range(1):
+					train_one_iter(dnn_inp, dnn_fit, self.args)
 
 			for leaf_ind in leaf_index:
 				save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+				one_hot_vec = [0 if leaf_ind != ind else 1 for ind in one_hot]
 
 				# Generate test case until p tests
 				while len(new_test) - last_test_num < pop_per_leaf:
-					children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
+					children = doam_cross(output[leaf_ind], leaf_ind, special, one_hot_vec, self.args)
 
 					for child in children:
 						child_found = False
@@ -296,14 +296,15 @@ class InputGenerator:
 
 				last_test_num = len(new_test)
 
-		
-		node_test = {}
+		# Set of braches coverd
+		br_pass = set()
+
 		for leaf_ind, lvl_dict in leaf_index_copy.items():
 			# Solution found for leaf
 			if leaf_ind in leaf_test:
 				for parent in lvl_dict:
-					node_test[parent] = leaf_test[leaf_ind]
-
+					br_pass.add(parent)
+					
 			else:
 				test = output[leaf_ind][0][0]
 				best_lvl = int(math.ceil(output[leaf_ind][0][1][leaf_ind]))
@@ -311,10 +312,10 @@ class InputGenerator:
 				for parent, lvl in lvl_dict.items():
 					# Add when only it's visited
 					if lvl >= best_lvl:
-						node_test[parent] = test
+						br_pass.add(parent)
 		
 		rt.append(2 * (len(branch.br_list) - 1))
-		rt.append(len(node_test))
+		rt.append(len(br_pass))
 
 		# Delete trashes
 		del module

@@ -27,6 +27,7 @@ def main():
         args.niter, args.lr, args.no_cuda, 
         args.step_size, args.seed, args.model_dir
     )
+
     print(input_generator.test_file(args.py_file))
 
 if __name__ == "__main__":

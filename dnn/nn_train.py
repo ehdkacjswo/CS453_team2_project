@@ -5,12 +5,12 @@ import numpy as np
 
 def guided_mutation(inputs, args):
 	inputs_var = torch.Tensor(inputs).to(args.device)
+	inputs_var.requires_grad_(True)
 	fitness = args.model(inputs_var)
 	grad = torch.autograd.grad(fitness, inputs_var)[0]
+	
 	mutated_input = inputs_var.detach() + args.step_size * torch.sign(grad.detach())
-	mutated_input[:, args.input_dim:] = inputs_var[:, args.input_dim:] 
-
-	return mutated_input
+	return mutated_input[:, :args.input_dim].round()
 
 def train_one_iter(inputs, fitness, args):
 	inputs_var = torch.Tensor(inputs).to(args.device)

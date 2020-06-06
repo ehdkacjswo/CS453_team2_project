@@ -1,13 +1,13 @@
 import random as rand
-import math
+import math, torch
 from ga.mutation import doam_mut
 from dnn.nn_train import guided_mutation
 
-def doam_cross(output, leaf_ind, special, args):
+def doam_cross(output, leaf_ind, special, one_hot_vec, args):
 	pair = []
 	
 	# Binary tournament selection
-	for k in range(2):
+	for i in range(2):
 		p1 = rand.choice(output)
 		p2 = rand.choice(output)
 
@@ -19,7 +19,7 @@ def doam_cross(output, leaf_ind, special, args):
 			pair.append(rand.choice([p1, p2]))
 
 	if pair[0][0] == pair[1][0]:
-		return doam_cross(output, leaf_ind, special, args)
+		return doam_cross(output, leaf_ind, special, one_hot_vec, args)
 
 	score1 = pair[0][1][leaf_ind]
 	score2 = pair[1][1][leaf_ind]
@@ -40,9 +40,13 @@ def doam_cross(output, leaf_ind, special, args):
 			
 	# Secant method
 	if score1 != score2:
-		children.append([math.ceil((pair[0][0][k] * (score2 + 1) - pair[1][0][k] * (score1 + 1)) / (score2 - score1)) for k in range(len(pair[0][0]))])
+		children.append([round((pair[0][0][i] * (score2 + 1) - pair[1][0][i] * (score1 + 1)) / (score2 - score1)) for i in range(len(pair[0][0]))])
 	
 	# Dnn help
+	if args.use_dnn:
+		for i in range(2):
+			children.append(guided_mutation([pair[i][0] + one_hot_vec], args).tolist()[0])
+			children[-1] = [int(inp) for inp in children[-1]]
 	
 	for child in children:
 		if rand.random() < args.pm or child == pair[0][0] or child == pair[1][0]:

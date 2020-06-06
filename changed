@@ -20,4 +20,33 @@ EX) [[1, 2, 2, 0.123421], [3, 3, 2, 0.213421]]
 
 Change input format to integer, argument passing revise
 
-TODO: add gradient support on crossover, control of global variables (# of gen, etc...)
+TODO: add gradient support on crossover, control of global variables (# of gen, etc...) -> resolved
+
+==========================
+doam.lee: dnn support for crossover
+Now it uses dnn support for crossover
+
+dnn part:
+input_generator.py 273~275: train dnn
+ga/crossover 48~49: gradient descent method
+
+TODO: resolve "Precision loss when unpacking double" problem, optimize entire algorithm,
+		add argument to decide whether to use dnn support
+
+==========================
+Specific error messeage
+
+Traceback (most recent call last):
+  File "main.py", line 33, in <module>
+    main()
+  File "main.py", line 30, in main
+    print(input_generator.test_file(args.py_file))
+  File "/home/doami/ast/input_generator.py", line 343, in test_file
+    rt.append(self.test_func(copy.deepcopy(root), ind, test_file_name, self.func_file + str(ind) + '.py'))
+  File "/home/doami/ast/input_generator.py", line 272, in test_func
+    train_one_iter(dnn_inp, dnn_fit, self.args)
+  File "/home/doami/ast/dnn/nn_train.py", line 16, in train_one_iter
+    inputs_var = torch.Tensor(inputs).to(args.device)
+RuntimeError: Precision loss when unpacking double
+
+
