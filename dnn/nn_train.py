@@ -17,7 +17,7 @@ def train_one_iter(model, optimizer, inputs, fitness, iter_num, device):
 	target_var = torch.Tensor(fitness).to(device)
 	pred = model(inputs_var)
 
-	loss = nn.MSELoss()(pred, fitness)
+	loss = nn.MSELoss()(pred, target_var.unsqueeze(1))
 
 	optimizer.zero_grad()
 	loss.backward()

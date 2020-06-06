@@ -162,7 +162,7 @@ class InputGenerator:
 
 		# Change function name and Import original function
 		func.name = self.new_func_name
-		root_copy.body.insert(0, ast.ImportFrom(module=test_file_name[:-3], names=[ast.alias(name=func_name, asname=None)], level=0))
+		root_copy.body.insert(0, ast.ImportFrom(module=test_file_name[:-3].replace('/', '.'), names=[ast.alias(name=func_name, asname=None)], level=0))
 		func.args.args.insert(0, ast.Name(id=self.file_name))
 
 		# Write changed code on new file
@@ -202,7 +202,7 @@ class InputGenerator:
 
 		# DNN init
 		input_dim = len(func.args.args)
-		model = MLP(input_dim + len(leaf_index)).to(self.device)
+		model = MLP(input_dim + len(leaf_index) - 1).to(self.device)
 		optimizer = optim.SGD(model.parameters(), lr=self.lr)
 		one_hot = list(leaf_index.keys())
 		
@@ -219,7 +219,7 @@ class InputGenerator:
 		print('\n')
 		
 		# Import revised code
-		module = importlib.import_module(func_file_name[:-3])
+		module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
 		method = getattr(module, self.new_func_name)
 		
 		# Tests that cover each leaves
@@ -279,7 +279,6 @@ class InputGenerator:
 			
 			new_test = []
 			last_test_num = 0
-
 			train_one_iter(model, optimizer, dnn_inp, dnn_fit, 1000, self.device)
 
 			for leaf_ind in leaf_index:
