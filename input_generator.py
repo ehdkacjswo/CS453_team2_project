@@ -18,23 +18,31 @@ class InputGenerator:
 			p, gen, pm_percent,
 			niter, lr, no_cuda, step_size, seed, model_dir):
 		self.p = p
-		self.save_p = 10
+		self.save_p = int(math.floor(p * 0.1))
 		self.gen = gen
-		self.pm = pm_percent / 100
-		self.sigma = 5
 
 		self.func_file = 'branch_dist_print'
 		self.br_file = 'br_dist'
 
 		use_cuda = torch.cuda.is_available()
-		self.device = torch.device("cuda" if use_cuda else "cpu")
+		device = torch.device("cuda" if use_cuda else "cpu")
 
 		self.niter = niter
 		self.lr = lr
 		self.no_cuda = no_cuda
-		self.step_size = step_size
 		self.seed = seed
 		self.model_dir = model_dir
+
+		self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size)
+	
+	# Class contains arguments for other functions
+	class Args:
+		def __init__(self, pm, alpha, beta, device, step_size):
+			self.pm = pm
+			self.alpha = alpha
+			self.beta = beta
+			self.device = device
+			self.step_size = step_size
 
 	# Generarte input from function ast
 	def gen_input(self, func):
@@ -49,12 +57,13 @@ class InputGenerator:
 				if rand.random() <= 0.2:
 					inp.append(rand.choice(special))
 				else:
-					inp.append(rand.uniform(-100, 100))
+					inp.append(rand.randint(-100, 100))
 			
 			rt = add_test(rt, inp)
 
-		return special, rt
+		print(special)
 
+		return special, rt
 
 	# Analyze the fitness output
 	def get_result(self, leaf_index):
@@ -120,16 +129,6 @@ class InputGenerator:
 			sys.stdout.close()
 			sys.stdout = self._original_stdout
 
-	# Return string that
-	@classmethod
-	def tf_br(cls, ind):
-		return '{}{}'.format(abs(ind), 'T' if ind > 0 else 'F')
-
-	# Get input dim
-	@classmethod
-	def get_input_dim(cls, func):
-		return len(func.args.args)
-
 	# Main part tests, evolves test cases
 	def test_func(self, root_copy, body_ind, test_file_name, func_file_name):
 		func = root_copy.body[body_ind]
@@ -138,7 +137,6 @@ class InputGenerator:
 			return
 
 		func_name = func.name
-		print('Function found ({})\n'.format(func_name))
 		func.name = self.new_func_name
 
 		# Needs no argument
@@ -146,7 +144,7 @@ class InputGenerator:
 			return 
 
 		branch.br_list = [None]
-		find_if(func.body, 0, self.temp_name, self.file_name, True)
+		find_if(func.body, 0, self.args, True)
 		
 		print('{} branches found'.format(len(branch.br_list) - 1))
 		
@@ -163,7 +161,7 @@ class InputGenerator:
 		# Change function name and Import original function
 		func.name = self.new_func_name
 		root_copy.body.insert(0, ast.ImportFrom(module=test_file_name[:-3].replace('/', '.'), names=[ast.alias(name=func_name, asname=None)], level=0))
-		func.args.args.insert(0, ast.Name(id=self.file_name))
+		func.args.args.insert(0, ast.Name(id=self.args.file_name))
 
 		# Write changed code on new file
 		code = astor.to_source(root_copy)
@@ -201,22 +199,16 @@ class InputGenerator:
 		leaf_index_copy = copy.deepcopy(leaf_index)
 
 		# DNN init
-		input_dim = len(func.args.args)
-		model = MLP(input_dim + len(leaf_index) - 1).to(self.device)
-		optimizer = optim.SGD(model.parameters(), lr=self.lr)
+		self.args.input_dim = len(func.args.args) - 1
+		self.args.model = MLP(self.args.input_dim + len(leaf_index)).to(self.args.device)
+		self.args.optimizer = optim.SGD(self.args.model.parameters(), lr=self.lr)
 		one_hot = list(leaf_index.keys())
 		
 		# Branch fitness output with(test, output)
 		output = {}
 
-		# Print leaf branches and init output
-		print('\nLeaf branches:')
-
-		for leaf_ind in sorted(leaf_index.keys(), key=lambda ind: abs(ind) * 2 + (1 if ind < 0 else 0)):
-			print('{} '.format(self.tf_br(leaf_ind))),
+		for leaf_ind in leaf_index.keys():
 			output[leaf_ind] = []
-		
-		print('\n')
 		
 		# Import revised code
 		module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
@@ -226,15 +218,11 @@ class InputGenerator:
 		leaf_test = {}
 		sol_found = False
 
-		mid_gen = {int(math.floor(self.gen * i * 0.1)): i for i in range(1, 11)}
 		# Return value (gen, # of br, # of br passed)
 		rt = []
 
 		for i in range(self.gen):
 			print(i, leaf_index.keys())
-			'''if i in mid_gen:
-				print('{}0% generation processed'.format(mid_gen[i]))'''
-
 			new_output = []
 			# Input and fitness for dnn
 			dnn_inp = []
@@ -261,7 +249,6 @@ class InputGenerator:
 						del leaf_index[leaf_ind]
 						
 						if not bool(leaf_index):
-							'''print('Every tests ares found!\n')'''
 							sol_found = True
 						break
 
@@ -279,17 +266,27 @@ class InputGenerator:
 			
 			new_test = []
 			last_test_num = 0
-			train_one_iter(model, optimizer, dnn_inp, dnn_fit, 1000, self.device)
+			pop_per_leaf = (self.p + len(leaf_index) - 1) / len(leaf_index)
+			train_one_iter(dnn_inp, dnn_fit, self.args)
 
 			for leaf_ind in leaf_index:
 				save_sel(output, new_output, leaf_ind, self.p, self.save_p)
 
 				# Generate test case until p tests
-				while len(new_test) - last_test_num < self.p:
-					children = doam_cross(output[leaf_ind], leaf_ind, special, self.pm, self.sigma)
+				while len(new_test) - last_test_num < pop_per_leaf:
+					children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
+
 					for child in children:
-						if not in_test([out[0] for out in output[leaf_ind]], child):
-							new_test = add_test(new_test, child)
+						child_found = False
+
+						# Check whether the child is already in test case
+						for sub_leaf_ind in leaf_index:
+							if in_test([out[0] for out in output[sub_leaf_ind]], child):
+								child_found = True
+								break
+
+							if not child_found:
+								new_test = add_test(new_test, child)
 
 				last_test_num = len(new_test)
 
@@ -312,19 +309,6 @@ class InputGenerator:
 		
 		rt.append(2 * (len(branch.br_list) - 1))
 		rt.append(len(node_test))
-		
-		'''for ind in range(1, len(branch.br_list)):
-			tf = [ind, -ind]
-
-			for br in tf:
-				# Solution found
-				if br in node_test:
-					print('{}: {}'.format(tf_br(br), node_test[br]))
-				# Solution not found
-				else:
-					print('{}: -'.format(tf_br(br)))
-
-		print('\n')'''
 
 		# Delete trashes
 		del module
@@ -339,13 +323,12 @@ class InputGenerator:
 
 	def test_file(self, test_file_name):
 		root = astor.code_to_ast.parse_file(test_file_name)
-		print(astor.dump_tree(root))
 		
 		# Generate unused variable name to avoid shadowing
 		var_len = name_len(root.body) + 1
 
-		self.file_name = 'f' * var_len
-		self.temp_name = 't' * var_len
+		self.args.file_name = 'f' * var_len
+		self.args.temp_name = 't' * var_len
 		self.new_func_name = 'f' * (var_len + 1)
 
 		rt = []

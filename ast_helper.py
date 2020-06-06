@@ -97,10 +97,10 @@ class branch:
 
 
 # Find branch of code from function body ast
-def find_if(body, parent, temp_name, file_name, reach):
+def find_if(body, parent, args, reach):
 	try:
 		for field in body._fields:
-			find_if(getattr(body, field), parent, temp_name, file_name, reach)
+			find_if(getattr(body, field), parent, args, reach)
 
 	except AttributeError:
 		if isinstance(body, list):
@@ -117,15 +117,15 @@ def find_if(body, parent, temp_name, file_name, reach):
 					new_branch = branch(parent, op_type, line.lineno, reach)
 
 					# Assign branch distance to temporary variable
-					body.insert(ind, ast.Assign(targets=[ast.Name(id=temp_name)],
+					body.insert(ind, ast.Assign(targets=[ast.Name(id=args.temp_name)],
 												value=node))
 
 					# Print branch_id, op_type, branch distance in order
-					body.insert(ind + 1, ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=file_name),
+					body.insert(ind + 1, ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=args.file_name),
 																				attr='write'),
 																				args=[ast.Call(func=ast.Attribute(value=ast.Str(s='{} {} {}\n'),
 																												attr='format'),
-																							args=[ast.Num(n=new_branch.ind), ast.Num(n=op_type), ast.Name(id=temp_name)],
+																							args=[ast.Num(n=new_branch.ind), ast.Num(n=op_type), ast.Name(id=args.temp_name)],
 																							keywords=[],
 																							starargs=None,
 																							kwargs=None)],
@@ -133,7 +133,7 @@ def find_if(body, parent, temp_name, file_name, reach):
 																				starargs=None,
 																				kwargs=None)))
 
-					line.test.left = ast.Name(id=temp_name)
+					line.test.left = ast.Name(id=args.temp_name)
 					line.test.comparators = [ast.Num(n=0)]
 
 					if op_type == 0:
@@ -145,12 +145,12 @@ def find_if(body, parent, temp_name, file_name, reach):
 						line.body.append(body[ind])
 						line.body.append(body[ind + 1])
 
-					find_if(line.body, new_branch.ind, temp_name, file_name, reach)
-					find_if(line.orelse, -new_branch.ind, temp_name, file_name, reach)
+					find_if(line.body, new_branch.ind, args, reach)
+					find_if(line.orelse, -new_branch.ind, args, reach)
 					
 					ind += 2
 
 				else:
-					find_if(line, parent, temp_name, file_name, reach)
+					find_if(line, parent, args, reach)
 
 				ind += 1

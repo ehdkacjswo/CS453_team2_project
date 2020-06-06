@@ -2,7 +2,7 @@ import random as rand
 import math
 
 # Mutate given input
-def doam_mut(test, special, pm, sigma):
+def doam_mut(test, special, pm, alpha, beta):
 	same = 0
 
 	for ind in range(len(test)):
@@ -11,13 +11,13 @@ def doam_mut(test, special, pm, sigma):
 			test[ind] = rand.choice(special)
 
 		elif prob <= pm:
-			test[ind] += rand.gauss(0, sigma)
+			test[ind] += (math.floor(rand.gammavariate(alpha, beta)) + 1) * rand.choice([-1, 1])
 
 		else:
 			same += 1
 	
 	# If none is changed, muteate again
 	if same == len(test):
-		return doam_mut(test, special, pm, sigma)
+		return doam_mut(test, special, pm, alpha, beta)
 	
 	return test

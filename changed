@@ -18,4 +18,6 @@ It takes file name as input, and returns [[# generation used, # total branch, # 
 for every functions detected in given file
 EX) [[1, 2, 2, 0.123421], [3, 3, 2, 0.213421]]
 
+Change input format to integer, argument passing revise
+
 TODO: add gradient support on crossover, control of global variables (# of gen, etc...)
