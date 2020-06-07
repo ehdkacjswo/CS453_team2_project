@@ -15,7 +15,7 @@ class MLP(nn.Module):
 		z = self.layer2(z)
 		z = nn.ReLU()(z)
 		z = self.layer3(z)
-		z = nn.ReLU()(z)
+		z = nn.Sigmoid()(z)
 		out = self.layer4(z)
 
 		return out

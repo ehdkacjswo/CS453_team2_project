@@ -240,7 +240,7 @@ class InputGenerator:
 							pass
 
 				new_output.append((inp, self.get_result(leaf_index)))
-					
+
 				# Check whether the solution is found
 				for leaf_ind in leaf_index:
 					# When the test is found for leaf
@@ -258,7 +258,7 @@ class InputGenerator:
 				if self.args.use_dnn:
 					for leaf_ind in leaf_index:
 						dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
-						dnn_fit.append(new_output[-1][1][leaf_ind])
+						dnn_fit.append(new_output[-1][1][leaf_ind] / len(leaf_index[leaf_ind]))
 
 			# Solution found or last generation
 			if sol_found or i == self.gen - 1:
@@ -271,7 +271,7 @@ class InputGenerator:
 			
 			'''for j in range(self.niter):'''
 			if self.args.use_dnn:
-				for j in range(10):
+				for j in range(1):
 					train_one_iter(dnn_inp, dnn_fit, self.args)
 
 			for leaf_ind in leaf_index:
