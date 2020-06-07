@@ -9,7 +9,7 @@ def test_me(x, y, z):
         if x + y == 100:
             print("2")
             a += 1
-            if z > 112831829389:
+            if z > 11283:
                 print("3")
                 a += 1
             else:

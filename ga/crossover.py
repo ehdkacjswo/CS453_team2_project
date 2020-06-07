@@ -3,7 +3,7 @@ import math, torch
 from ga.mutation import doam_mut
 from dnn.nn_train import guided_mutation
 
-def doam_cross(output, leaf_ind, special, one_hot_vec, args):
+def doam_cross(output, leaf_ind, special, args):
 	pair = []
 	
 	# Binary tournament selection
@@ -19,7 +19,7 @@ def doam_cross(output, leaf_ind, special, one_hot_vec, args):
 			pair.append(rand.choice([p1, p2]))
 
 	if pair[0][0] == pair[1][0]:
-		return doam_cross(output, leaf_ind, special, one_hot_vec, args)
+		return doam_cross(output, leaf_ind, special, args)
 
 	score1 = pair[0][1][leaf_ind]
 	score2 = pair[1][1][leaf_ind]
@@ -45,7 +45,7 @@ def doam_cross(output, leaf_ind, special, one_hot_vec, args):
 	# Dnn help
 	if args.use_dnn:
 		for i in range(2):
-			children.append(guided_mutation([pair[i][0] + one_hot_vec], args).tolist()[0])
+			children.append(guided_mutation([pair[i][0] + args.one_hot_vec], args).tolist()[0])
 			children[-1] = [int(inp) for inp in children[-1]]
 	
 	for child in children:

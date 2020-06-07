@@ -33,17 +33,17 @@ class InputGenerator:
 		self.seed = seed
 		self.model_dir = model_dir
 
-		self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size, True)
+		self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size)
 	
 	# Class contains arguments for other functions
 	class Args:
-		def __init__(self, pm, alpha, beta, device, step_size, use_dnn):
+		def __init__(self, pm, alpha, beta, device, step_size):
 			self.pm = pm
 			self.alpha = alpha
 			self.beta = beta
 			self.device = device
 			self.step_size = step_size
-			self.use_dnn = use_dnn
+			self.use_dnn = True
 
 	# Generarte input from function ast
 	def gen_input(self, func):
@@ -240,7 +240,7 @@ class InputGenerator:
 							pass
 
 				new_output.append((inp, self.get_result(leaf_index)))
-					
+
 				# Check whether the solution is found
 				for leaf_ind in leaf_index:
 					# When the test is found for leaf
@@ -258,7 +258,7 @@ class InputGenerator:
 				if self.args.use_dnn:
 					for leaf_ind in leaf_index:
 						dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
-						dnn_fit.append(new_output[-1][1][leaf_ind])
+						dnn_fit.append(new_output[-1][1][leaf_ind] / len(leaf_index[leaf_ind]))
 
 			# Solution found or last generation
 			if sol_found or i == self.gen - 1:
@@ -276,11 +276,13 @@ class InputGenerator:
 
 			for leaf_ind in leaf_index:
 				save_sel(output, new_output, leaf_ind, self.p, self.save_p)
-				one_hot_vec = [0 if leaf_ind != ind else 1 for ind in one_hot]
+				
+				if self.args.use_dnn:
+					self.args.one_hot_vec = [0 if leaf_ind != ind else 1 for ind in one_hot]
 
 				# Generate test case until p tests
 				while len(new_test) - last_test_num < pop_per_leaf:
-					children = doam_cross(output[leaf_ind], leaf_ind, special, one_hot_vec, self.args)
+					children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
 
 					for child in children:
 						child_found = False
@@ -328,7 +330,7 @@ class InputGenerator:
 
 		return rt
 
-	def test_file(self, test_file_name):
+	def test_file(self, test_file_name, use_dnn):
 		root = astor.code_to_ast.parse_file(test_file_name)
 		
 		# Generate unused variable name to avoid shadowing
@@ -337,6 +339,8 @@ class InputGenerator:
 		self.args.file_name = 'f' * var_len
 		self.args.temp_name = 't' * var_len
 		self.new_func_name = 'f' * (var_len + 1)
+
+		self.args.use_dnn = use_dnn
 
 		rt = []
 
