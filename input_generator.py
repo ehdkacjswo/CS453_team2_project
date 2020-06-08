@@ -323,10 +323,10 @@ class InputGenerator:
 		del module
 		del method
 
-		'''if os.path.exists(func_file_name):
+		if os.path.exists(func_file_name):
 			os.remove(func_file_name)
 		if os.path.exists(self.br_file):
-			os.remove(self.br_file)'''
+			os.remove(self.br_file)
 
 		return rt
 
