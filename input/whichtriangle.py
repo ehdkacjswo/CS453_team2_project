@@ -12,3 +12,7 @@ def whichtriangle(x,y,z):
             print ("Isosceles triangle")
     else:
         print("Scalene triangle")
+
+
+#[[1000, 12, 9, 140.40512895584106]] 
+#[[1000, 12, 9, 85.82653522491455]]

@@ -1,3 +1,4 @@
+
 def function2(x, y, z):
     if (x == y):
         if (y == z):
