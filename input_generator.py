@@ -81,7 +81,7 @@ class InputGenerator:
 			
 			# Passed branch has non-poisitve branch distance
 			# Otherwise, not passed
-			new_data = [(br_id, br_dist), (-br_id, -br_dist)]
+			new_data = [(br_id, br_dist), (-br_id, self.args.k - br_dist)]
 
 			for tup in new_data:
 				item = br_dict.get(tup[0])
@@ -246,6 +246,8 @@ class InputGenerator:
 					if new_output[-1][1][leaf_ind] < 0:
 						leaf_test[leaf_ind] = copy.deepcopy(inp)
 						del leaf_index[leaf_ind]
+
+						print(leaf_ind, new_output[-1][0])
 						
 						if not bool(leaf_index):
 							sol_found = True
@@ -321,10 +323,10 @@ class InputGenerator:
 		del module
 		del method
 
-		if os.path.exists(func_file_name):
+		'''if os.path.exists(func_file_name):
 			os.remove(func_file_name)
 		if os.path.exists(self.br_file):
-			os.remove(self.br_file)
+			os.remove(self.br_file)'''
 
 		return rt
 

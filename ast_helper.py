@@ -57,19 +57,19 @@ def branch_dist_comp(test, args):
 													kwargs=None))
 	
 	elif isinstance(test.ops[0], ast.Lt):
-		op_type = 1
+		op_type = 3
 		br_dist = ast.BinOp(left=test.left, op=ast.Sub(), right=test.comparators[0])
 
 	elif isinstance(test.ops[0], ast.LtE):
-		op_type = 0
+		op_type = 4
 		br_dist = ast.BinOp(left=test.left, op=ast.Sub(), right=test.comparators[0])
 	
 	elif isinstance(test.ops[0], ast.Gt):
-		op_type = 1
+		op_type = 3
 		br_dist = ast.BinOp(left=test.comparators[0], op=ast.Sub(), right=test.left)
 
 	elif isinstance(test.ops[0], ast.GtE):
-		op_type = 0
+		op_type = 4
 		br_dist = ast.BinOp(left=test.comparators[0], op=ast.Sub(), right=test.left)
 	
 	return ast.Call(func=ast.Lambda(args=ast.arguments(args=[ast.arg(arg=args.lambda_arg, annotation=None)],
@@ -79,18 +79,21 @@ def branch_dist_comp(test, args):
 														kwarg=None,
 														defaults=[]),
 									 body=ast.IfExp(test=ast.Compare(left=ast.Name(id=args.lambda_arg),
-									 									ops=[ast.LtE() if op_type == 0 else ast.Lt()],
+									 									ops=[ast.LtE() if op_type % 2 == 0 else ast.Lt()],
 																		comparators=[ast.Num(n=0)]),
 													body=ast.Name(id=args.lambda_arg),
 													orelse=ast.BinOp(left=ast.Name(id=args.lambda_arg),
 																		op=ast.Add(),
-																		right=ast.Num(args.k)))),
+																		right=ast.Num(0 if op_type < 2 else args.k)))),
 					args=[br_dist],
 					keywords=[])
 
 # Branch distance for boolean operator (and, or)
-def branch_dist_boolop(test, args):
-	if isinstance(test.op, ast.And):
+def branch_dist_boolop(op, values, args):
+	if len(values) == 1:
+		return branch_dist(values[0], args)
+
+	else:
 		return ast.Call(func=ast.Lambda(args=ast.arguments(args=[ast.arg(arg=args.lambda_arg, annotation=None)],
 															vararg=None,
 															kwonlyargs=[],
@@ -98,26 +101,11 @@ def branch_dist_boolop(test, args):
 															kwarg=None,
 															defaults=[]),
 										body=ast.IfExp(test=ast.Compare(left=ast.Name(id=args.lambda_arg),
-																		ops=[ast.Gt()],
+																		ops=[ast.Gt() if isinstance(op,ast.And) else ast.LtE()],
 																		comparators=[ast.Num(n=0)]),
 														body=ast.Name(id=args.lambda_arg),
-														orelse=branch_dist(test.values[1], args))),
-						args=[branch_dist(test.values[0], args)],
-						keywords=[])
-	
-	elif isinstance(test.op, ast.Or):
-		return ast.Call(func=ast.Lambda(args=ast.arguments(args=[ast.arg(arg=args.lambda_arg, annotation=None)],
-															vararg=None,
-															kwonlyargs=[],
-															kw_defaults=[],
-															kwarg=None,
-															defaults=[]),
-										body=ast.IfExp(test=ast.Compare(left=ast.Name(id=args.lambda_arg),
-																		ops=[ast.LtE()],
-																		comparators=[ast.Num(n=0)]),
-														body=ast.Name(id=args.lambda_arg),
-														orelse=branch_dist(test.values[1], args))),
-						args=[branch_dist(test.values[0], args)],
+														orelse=branch_dist_boolop(op, values[1:], args))),
+						args=[branch_dist(values[0], args)],
 						keywords=[])
 
 # Branch distance for not operator
@@ -129,7 +117,7 @@ def branch_dist(test, args):
 		return branch_dist_comp(test, args)
 	
 	elif isinstance(test, ast.BoolOp):
-		return branch_dist_boolop(test, args)
+		return branch_dist_boolop(test.op, test.values, args)
 	
 	elif isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
 		return branch_dist_not(test, args)
