@@ -44,6 +44,7 @@ class InputGenerator:
 			self.device = device
 			self.step_size = step_size
 			self.use_dnn = True
+			self.k = 1
 
 	# Generarte input from function ast
 	def gen_input(self, func):
@@ -76,13 +77,11 @@ class InputGenerator:
 		br_dict = {}
 
 		for data in br_data:
-			br_id, br_type, br_dist = [float(x) for x in data.split(" ")]
+			br_id, br_dist = [float(x) for x in data.split(" ")]
 			
-			# When branch is passed, make fitness negative(-1)
-			if (br_type == 0 and br_dist <= 0) or (br_type == 1 and br_dist < 0):
-				new_data = [(br_id, -1), (-br_id, -br_dist)]
-			else:
-				new_data = [(br_id, br_dist), (-br_id, -1)]
+			# Passed branch has non-poisitve branch distance
+			# Otherwise, not passed
+			new_data = [(br_id, br_dist), (-br_id, self.args.k - br_dist)]
 
 			for tup in new_data:
 				item = br_dict.get(tup[0])
@@ -98,11 +97,11 @@ class InputGenerator:
 				dist = br_dict.get(ind)
 
 				if dist is not None:
-					if dist >= 0:
-						br_fit[leaf_ind] = lvl + float(dist + 1) / (dist + 2)
+					if dist > 0:
+						br_fit[leaf_ind] = lvl + float(dist) / (dist + 1)
 						break
 
-					if dist < 0:
+					else:
 						if lvl == 0:
 							br_fit[leaf_ind] = -1
 
@@ -269,7 +268,6 @@ class InputGenerator:
 			last_test_num = 0
 			pop_per_leaf = (self.p + len(leaf_index) - 1) / len(leaf_index)
 			
-			'''for j in range(self.niter):'''
 			if self.args.use_dnn:
 				for j in range(1):
 					train_one_iter(dnn_inp, dnn_fit, self.args)
@@ -338,6 +336,7 @@ class InputGenerator:
 
 		self.args.file_name = 'f' * var_len
 		self.args.temp_name = 't' * var_len
+		self.args.lambda_arg = 'x' * var_len
 		self.new_func_name = 'f' * (var_len + 1)
 
 		self.args.use_dnn = use_dnn
