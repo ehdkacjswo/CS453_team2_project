@@ -4,6 +4,7 @@ import math
 # Mutate given input
 def doam_mut(test, special, pm, alpha, beta):
 	same = 0
+	rt = []
 
 	for ind in range(len(test)):
 		prob = rand.random()

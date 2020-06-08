@@ -1,5 +1,5 @@
 import random as rand
-import math, torch
+import math, torch, copy
 from ga.mutation import doam_mut
 from dnn.nn_train import guided_mutation
 
@@ -35,8 +35,8 @@ def doam_cross(output, leaf_ind, special, args):
 
 	# If single point crossover is unvailable, mutate
 	else:
-		children.append(doam_mut(pair[0][0], special, 1.0, args.alpha, args.beta))
-		children.append(doam_mut(pair[1][0], special, 1.0, args.alpha, args.beta))
+		children.append(doam_mut(copy.deepcopy(pair[0][0]), special, 1.0, args.alpha, args.beta))
+		children.append(doam_mut(copy.deepcopy(pair[1][0]), special, 1.0, args.alpha, args.beta))
 			
 	# Secant method
 	if score1 != score2:

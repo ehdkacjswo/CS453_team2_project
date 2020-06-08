@@ -246,8 +246,6 @@ class InputGenerator:
 					if new_output[-1][1][leaf_ind] < 0:
 						leaf_test[leaf_ind] = copy.deepcopy(inp)
 						del leaf_index[leaf_ind]
-
-						print(leaf_ind, new_output[-1][0])
 						
 						if not bool(leaf_index):
 							sol_found = True
