@@ -27,7 +27,7 @@ def doam_cross(output, leaf_ind, special, args):
 	children = []
 
 	# Single point crossover
-	if len(pair[0][0]) > 1:
+	if rand.random() < 0.9 and len(pair[0][0]) > 1:
 		cross_point = rand.randint(1, len(pair[0][0]) - 1)
 
 		children.append(pair[0][0][:cross_point] + pair[1][0][cross_point:])
@@ -39,8 +39,8 @@ def doam_cross(output, leaf_ind, special, args):
 		children.append(doam_mut(copy.deepcopy(pair[1][0]), special, 1.0, args.alpha, args.beta))
 			
 	# Secant method
-	if score1 != score2:
-		children.append([round((pair[0][0][i] * (score2 + 1) - pair[1][0][i] * (score1 + 1)) / (score2 - score1)) for i in range(len(pair[0][0]))])
+	'''if score1 != score2:
+		children.append([round((pair[0][0][i] * (score2 + 1) - pair[1][0][i] * (score1 + 1)) / (score2 - score1)) for i in range(len(pair[0][0]))])'''
 	
 	# Dnn help
 	if args.use_dnn:

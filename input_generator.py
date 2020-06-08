@@ -59,7 +59,7 @@ class InputGenerator:
 				if rand.random() <= 0.2:
 					inp.append(rand.choice(special))
 				else:
-					inp.append(rand.randint(-100, 100))
+					inp.append(rand.randint(-10000, 10000))
 			
 			rt = add_test(rt, inp)
 
@@ -205,9 +205,11 @@ class InputGenerator:
 		
 		# Branch fitness output with(test, output)
 		output = {}
+		last_best = {}
 
 		for leaf_ind in leaf_index.keys():
 			output[leaf_ind] = []
+			last_best[leaf_ind] = [-1, 0]
 		
 		# Import revised code
 		module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
@@ -220,8 +222,16 @@ class InputGenerator:
 		# Return value (gen, # of br, # of br passed)
 		rt = []
 
+		print(leaf_index.keys())
+
+		t = 0.5
+		a = 0.9
+		b = 0.0001
+
 		for i in range(self.gen):
-			print(i, leaf_index.keys())
+			self.args.step_size = t
+			t = t * a + b
+			#print(i, leaf_index.keys())
 			new_output = []
 			# Input and fitness for dnn
 			dnn_inp = []
@@ -246,6 +256,8 @@ class InputGenerator:
 					if new_output[-1][1][leaf_ind] < 0:
 						leaf_test[leaf_ind] = copy.deepcopy(inp)
 						del leaf_index[leaf_ind]
+
+						print(i, leaf_ind, leaf_test[leaf_ind])
 						
 						if not bool(leaf_index):
 							sol_found = True
@@ -257,7 +269,7 @@ class InputGenerator:
 				if self.args.use_dnn:
 					for leaf_ind in leaf_index:
 						dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
-						dnn_fit.append(new_output[-1][1][leaf_ind] / len(leaf_index[leaf_ind]))
+						dnn_fit.append(new_output[-1][1][leaf_ind])
 
 			# Solution found or last generation
 			if sol_found or i == self.gen - 1:
@@ -269,11 +281,26 @@ class InputGenerator:
 			pop_per_leaf = (self.p + len(leaf_index) - 1) / len(leaf_index)
 			
 			if self.args.use_dnn:
-				for j in range(1):
+				for j in range(2):
 					train_one_iter(dnn_inp, dnn_fit, self.args)
 
+			ind_del = []
+			
 			for leaf_ind in leaf_index:
 				save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+
+				if abs(last_best[leaf_ind][0] - output[leaf_ind][0][1][leaf_ind]) < 1e-5:
+					last_best[leaf_ind][1] += 1
+
+					if last_best[leaf_ind][1] >= 5:
+						ind_del.append(leaf_ind)
+						continue
+
+				else:
+					last_best[leaf_ind][1] = 0
+
+				last_best[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
+
 				
 				if self.args.use_dnn:
 					self.args.one_hot_vec = [0 if leaf_ind != ind else 1 for ind in one_hot]
@@ -295,6 +322,13 @@ class InputGenerator:
 								new_test = add_test(new_test, child)
 
 				last_test_num = len(new_test)
+
+			for ind in ind_del:
+				del leaf_index[ind]
+
+			if not bool(leaf_index):
+				rt.append(i+1)
+				break
 
 		# Set of braches coverd
 		br_pass = set()
