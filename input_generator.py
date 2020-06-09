@@ -150,8 +150,8 @@ class InputGenerator:
 		if len(branch.br_list) == 1:
 			return
 		
-		for cur_br in branch.br_list[1:]:
-			print('Branch #{} on line {}'.format(cur_br.ind, cur_br.lineno))
+		'''for cur_br in branch.br_list[1:]:
+			print('Branch #{} on line {}'.format(cur_br.ind, cur_br.lineno))'''
 
 		# Generate input
 		special, new_test = self.gen_input(func)	
@@ -199,17 +199,30 @@ class InputGenerator:
 		# DNN init
 		if self.args.use_dnn:
 			self.args.input_dim = len(func.args.args) - 1
-			self.args.model = MLP(self.args.input_dim + len(leaf_index)).to(self.args.device)
+			self.args.dnn = {}
+			'''self.args.model = MLP(self.args.input_dim + len(leaf_index)).to(self.args.device)
 			self.args.optimizer = optim.SGD(self.args.model.parameters(), lr=self.lr)
-			one_hot = list(leaf_index.keys())
+			one_hot = list(leaf_index.keys())'''
 		
 		# Branch fitness output with(test, output)
 		output = {}
 		last_best = {}
+		dnn_inp = {}
+		dnn_fit = {}
 
-		for leaf_ind in leaf_index.keys():
+		for leaf_ind in leaf_index:
 			output[leaf_ind] = []
+
+			# (Best fitness, number of generation passed) for each leaves
 			last_best[leaf_ind] = [-1, 0]
+
+			if self.args.use_dnn:
+				model = MLP(self.args.input_dim).to(self.args.device)
+				opt = optim.SGD(model.parameters(), lr=self.lr)
+				self.args.dnn[leaf_ind] = (model, opt)
+
+				dnn_inp[leaf_ind] = []
+				dnn_fit[leaf_ind] = []
 		
 		# Import revised code
 		module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
@@ -234,8 +247,8 @@ class InputGenerator:
 			#print(i, leaf_index.keys())
 			new_output = []
 			# Input and fitness for dnn
-			dnn_inp = []
-			dnn_fit = []
+			'''dnn_inp = {}
+			dnn_fit = {}'''
 
 			# Test each inputs
 			for inp in new_test:
@@ -268,8 +281,10 @@ class InputGenerator:
 
 				if self.args.use_dnn:
 					for leaf_ind in leaf_index:
-						dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
-						dnn_fit.append(new_output[-1][1][leaf_ind])
+						dnn_inp[leaf_ind].append(new_output[-1][0])
+						dnn_fit[leaf_ind].append([new_output[-1][1][leaf_ind]])
+						#dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
+						#dnn_fit.append([new_output[-1][1][leaf_ind]])
 
 			# Solution found or last generation
 			if sol_found or i == self.gen - 1:
@@ -281,15 +296,22 @@ class InputGenerator:
 			pop_per_leaf = (self.p + len(leaf_index) - 1) / len(leaf_index)
 			
 			if self.args.use_dnn:
-				for j in range(2):
-					train_one_iter(dnn_inp, dnn_fit, self.args)
+				for leaf_ind in leaf_index:
+					for j in range(self.niter):
+						if train_one_iter(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args) < 1:
+							break
+						'''if j == 99:
+							print(train_one_iter(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args))'''
+
+					dnn_inp[leaf_ind].clear()
+					dnn_fit[leaf_ind].clear()
 
 			ind_del = []
 			
 			for leaf_ind in leaf_index:
 				save_sel(output, new_output, leaf_ind, self.p, self.save_p)
 
-				if abs(last_best[leaf_ind][0] - output[leaf_ind][0][1][leaf_ind]) < 1e-5:
+				if abs(last_best[leaf_ind][0] - output[leaf_ind][0][1][leaf_ind]) < 1e-6:
 					last_best[leaf_ind][1] += 1
 
 					if last_best[leaf_ind][1] >= 5:
@@ -302,8 +324,8 @@ class InputGenerator:
 				last_best[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
 
 				
-				if self.args.use_dnn:
-					self.args.one_hot_vec = [0 if leaf_ind != ind else 1 for ind in one_hot]
+				'''if self.args.use_dnn:
+					self.args.one_hot_vec = [0 if leaf_ind != ind else 1 for ind in one_hot]'''
 
 				# Generate test case until p tests
 				while len(new_test) - last_test_num < pop_per_leaf:
