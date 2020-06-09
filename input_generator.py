@@ -34,6 +34,12 @@ class InputGenerator:
 		self.model_dir = model_dir
 
 		self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size)
+
+		rand.seed(seed)
+		torch.manual_seed(seed)
+		torch.cuda.manual_seed_all(seed)
+		torch.backends.cudnn.deterministic = True
+		torch.backends.cudnn.benchmark = False
 	
 	# Class contains arguments for other functions
 	class Args:
