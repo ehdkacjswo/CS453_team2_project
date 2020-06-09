@@ -1,12 +1,47 @@
-def function3(a, b):
+def function3(a, b, c):
     if (a < b + 1):
         if (a == b):
-            print ("hi")
+            if (c > 100):
+                if (a > -52):
+                    if (b < 30):
+                        pass
+            elif (c < 50):
+                if (a < c):
+                    if (b < 1):
+                        pass
         elif (a + 1 == b):
-            print ("hi2")
+            if (c > 130):
+                if (a > -5):
+                    if (b < 10):
+                        pass
+            elif (c < 20):
+                if (a < c):
+                    if (b < 1):
+                        pass
         elif (a + 2 == b):
-            print ("hi3")
+            if (c > 10):
+                if (a >= -12):
+                    if (b == -30):
+                        pass
+            elif (c < 80):
+                if (a > c):
+                    if (b < 1):
+                        pass
         elif (a + 3 == b):
-            print ("hi4")
+            if (c > 10000):
+                if (a > -6):
+                    if (b < 30):
+                        pass
+            elif (c < 500):
+                if (a == c):
+                    if (b < 1):
+                        pass
         elif (a + 4 == b ):
-            print ("hi5")
+            if (c > -100):
+                if (a > -5):
+                    if (b < 30):
+                        pass
+            elif (c < 35):
+                if (a > c):
+                    if (b < 1):
+                        pass
