@@ -57,19 +57,19 @@ def branch_dist_comp(test, args):
 													kwargs=None))
 	
 	elif isinstance(test.ops[0], ast.Lt):
-		op_type = 3
+		op_type = 1
 		br_dist = ast.BinOp(left=test.left, op=ast.Sub(), right=test.comparators[0])
 
 	elif isinstance(test.ops[0], ast.LtE):
-		op_type = 4
+		op_type = 0
 		br_dist = ast.BinOp(left=test.left, op=ast.Sub(), right=test.comparators[0])
 	
 	elif isinstance(test.ops[0], ast.Gt):
-		op_type = 3
+		op_type = 1
 		br_dist = ast.BinOp(left=test.comparators[0], op=ast.Sub(), right=test.left)
 
 	elif isinstance(test.ops[0], ast.GtE):
-		op_type = 4
+		op_type = 0
 		br_dist = ast.BinOp(left=test.comparators[0], op=ast.Sub(), right=test.left)
 	
 	return ast.Call(func=ast.Lambda(args=ast.arguments(args=[ast.arg(arg=args.lambda_arg, annotation=None)],
@@ -79,12 +79,12 @@ def branch_dist_comp(test, args):
 														kwarg=None,
 														defaults=[]),
 									 body=ast.IfExp(test=ast.Compare(left=ast.Name(id=args.lambda_arg),
-									 									ops=[ast.LtE() if op_type % 2 == 0 else ast.Lt()],
+									 									ops=[ast.LtE() if op_type == 0 else ast.Lt()],
 																		comparators=[ast.Num(n=0)]),
 													body=ast.Name(id=args.lambda_arg),
 													orelse=ast.BinOp(left=ast.Name(id=args.lambda_arg),
 																		op=ast.Add(),
-																		right=ast.Num(0 if op_type < 2 else args.k)))),
+																		right=ast.Num(args.k)))),
 					args=[br_dist],
 					keywords=[])
 
@@ -190,9 +190,7 @@ def find_if(body, parent, args, reach):
 																				starargs=None,
 																				kwargs=None)))
 
-					line.test.left = ast.Name(id=args.temp_name)
-					line.test.comparators = [ast.Num(n=0)]
-					line.test.ops = [ast.LtE()]
+					line.test = ast.Compare(left=ast.Name(id=args.temp_name), ops=[ast.LtE()], comparators=[ast.Num(n=0)])
 					
 					if isinstance(line, ast.While):
 						line.body.append(body[ind])

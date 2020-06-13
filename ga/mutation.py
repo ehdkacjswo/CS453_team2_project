@@ -14,7 +14,7 @@ def doam_mut(test, special, pm, alpha, beta):
 
 		elif prob <= pm:
 			test[ind] += (math.floor(rand.gammavariate(alpha, beta)) + 1) * rand.choice([-1, 1])
-
+			#test[ind] += rand.choice([-1, 1])
 		else:
 			same += 1
 	

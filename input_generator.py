@@ -160,7 +160,8 @@ class InputGenerator:
 			print('Branch #{} on line {}'.format(cur_br.ind, cur_br.lineno))'''
 
 		# Generate input
-		special, new_test = self.gen_input(func)	
+		special, new_test = self.gen_input(func)
+		print(special)
 
 		# Change function name and Import original function
 		func.name = self.new_func_name
@@ -383,10 +384,10 @@ class InputGenerator:
 		del module
 		del method
 
-		if os.path.exists(func_file_name):
+		'''if os.path.exists(func_file_name):
 			os.remove(func_file_name)
 		if os.path.exists(self.br_file):
-			os.remove(self.br_file)
+			os.remove(self.br_file)'''
 
 		return rt
 
