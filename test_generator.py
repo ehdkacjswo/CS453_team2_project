@@ -9,7 +9,7 @@ from ga.crossover import doam_cross
 from ga.mutation import doam_mut
 
 from dnn.model import MLP
-from dnn.nn_train import guided_mutation, train_one_iter
+from dnn.nn_train import guided_mutation, train_one_iter, forward
 import torch
 import torch.optim as optim
 
@@ -155,6 +155,7 @@ class TestGenerator:
 				# When the test is found for leaf
 				if new_output[-1][1][leaf_ind] < 0:
 					del self.leaf_index[leaf_ind]
+					self.leaf_cover.append(leaf_ind)
 
 					print(leaf_ind, inp)
 						
@@ -289,7 +290,18 @@ class TestGenerator:
 		a = 0.9
 		b = 0.0001
 
+		use_approx = False
+
+		# Population initialization
 		new_output, sol_found = self.test_and_learn(new_test)
+
+		for leaf_ind in self.leaf_index:
+			save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+			output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
+
+			# Update best fitness
+			last_best[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
+
 		use_approx = False
 
 		for i in range(self.gen):
@@ -298,33 +310,13 @@ class TestGenerator:
 			t = t * a + b
 			
 			if not use_approx:
-				# Solution found or last generation
-				if sol_found or i == self.gen - 1:
-					rt.append(i + 1)
-					break
-
+				#use_approx = True
 				new_test = []
 				last_test_num = 0
 				pop_per_leaf = (self.p + len(self.leaf_index) - 1) / len(self.leaf_index)
 
-				ind_del = []
-			
+				# Create new test cases
 				for leaf_ind in self.leaf_index:
-					save_sel(output, new_output, leaf_ind, self.p, self.save_p)
-					output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
-
-					if abs(last_best[leaf_ind][0] - output[leaf_ind][0][1][leaf_ind]) < 1e-6:
-						last_best[leaf_ind][1] += 1
-
-						if last_best[leaf_ind][1] >= 5:
-							ind_del.append(leaf_ind)
-							continue
-
-					else:
-						last_best[leaf_ind][1] = 0
-
-					last_best[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
-
 					# Generate test case until p tests
 					while len(new_test) - last_test_num < pop_per_leaf:
 						children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
@@ -340,39 +332,79 @@ class TestGenerator:
 
 							if not child_found:
 								add_test(new_test, child)
+					
+					# When we use approximation on next generation
+					# Add gradient descent of first save_p tests
+					if use_approx:
+						for test in [out[0] for out in output[leaf_ind][:self.save_p]]:
+							child = guided_mutation([test], leaf_ind, self.args).tolist()[0]
+							child_found = False
 
+							for sub_leaf_ind in self.leaf_index:
+								if in_test([out[0] for out in output[leaf_ind]], child):
+									child_found = True
+									break
+							
+							if not child_found:
+								add_test(new_test, child)
+					
 					last_test_num = len(new_test)
+				
+				new_output, sol_found = self.test_and_learn(new_test)
+				
+				if sol_found:
+					rt.append(i + 1)
+					break
+
+				# Leaves to delete (early stop)
+				ind_del = []
+
+				# Select population
+				for leaf_ind in self.leaf_index:
+					save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+					output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
+
+					# Early stop
+					if abs(last_best[leaf_ind][0] - output[leaf_ind][0][1][leaf_ind]) < 1e-6:
+						last_best[leaf_ind][1] += 1
+
+						if last_best[leaf_ind][1] >= 5:
+							ind_del.append(leaf_ind)
+							continue
+
+					else:
+						last_best[leaf_ind][1] = 0
+
+					last_best[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
 
 				for ind in ind_del:
 					del self.leaf_index[ind]
 
-				if not bool(self.leaf_index):
-					rt.append(i+1)
+				if not bool(self.leaf_index) or i == self.gen - 1:
+					rt.append(i + 1)
 					break
-
-				new_output, sol_found = self.test_and_learn(new_test)
 
 			# Use approximation
 			else:
-				'''for leaf_ind in self.leaf_index:
-					new_output = []
+				for leaf_ind in self.leaf_index:
+					new_test = []
 
-					for test in  
+					# Get 
+					for test in  [out[0] for out in output[leaf_ind][self.save_p:]]:
+						child = guided_mutation([test], leaf_ind, self.args).tolist()[0]
 
-					child = guided_mutation(
-						children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
-
-						for child in children:
-							if in_test([out[0] for out in output[leaf_ind]], child):
-								child_found = True
-								break
-
-						if not child_found:
+						if not in_test([out[0] for out in output[leaf_ind]], child):
 							add_test(new_test, child)
 
 					new_output = []
 					
-					for test in new_test:'''
+					for test in new_test:
+						new_output.append((test, {leaf_ind : forward([test], leaf_ind, self.args)}))
+
+						# Found deeper case
+						if new_output[-1][1][leaf_ind] < math.floor(output[leaf_ind][0][1][leaf_ind]):
+							use_approx = False
+					
 
 				pass
 				
@@ -381,7 +413,7 @@ class TestGenerator:
 
 		for leaf_ind, lvl_dict in leaf_index_copy.items():
 			# Solution found for leaf
-			if leaf_ind not in self.leaf_index:
+			if leaf_ind in self.leaf_cover:
 				for parent in lvl_dict:
 					br_pass.add(parent)
 					

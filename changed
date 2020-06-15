@@ -49,4 +49,9 @@ Traceback (most recent call last):
     inputs_var = torch.Tensor(inputs).to(args.device)
 RuntimeError: Precision loss when unpacking double
 
+==========================
+doam.lee: fitness approximation with dnn
+
+TODO: Finish approximation part (add new_output to original output, adjust ending condition)
+		May apply dynamic step size for guided_mutation
 

@@ -32,3 +32,9 @@ def train_one_iter(inputs, fitness, leaf_ind, args):
 
 	'''print("[{}/{}]: loss={}".format(iter_num, args.niter, loss.item()))'''
 	return loss.item()
+
+def forward(inputs, leaf_ind, args):
+	inputs_var = torch.Tensor(inputs).to(args.device)
+	pred = args.dnn[leaf_ind][0](inputs_var)
+
+	return pred.item()
