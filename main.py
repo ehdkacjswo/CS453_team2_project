@@ -1,5 +1,5 @@
 import argparse
-from input_generator import InputGenerator
+from test_generator import TestGenerator
 
 def main():
 	parser = argparse.ArgumentParser()
@@ -22,17 +22,17 @@ def main():
 	parser.add_argument('--model-dir', help='model save directory', default='./ckpt')
 
 	args = parser.parse_args()
-	input_generator = InputGenerator(
+	test_generator = TestGenerator(
 		args.p, args.gen, args.pm, 
 		args.niter, args.lr, args.no_cuda,
 		args.step_size, args.seed, args.model_dir
 	)
 	# Experiment with dnn or not
 	print('testing with dnn')
-	print(input_generator.test_file(args.py_file, True), '\n')
+	print(test_generator.test_file(args.py_file, True), '\n')
 
 	print('testing without dnn')
-	print(input_generator.test_file(args.py_file, False))
+	print(test_generator.test_file(args.py_file, False))
 
 if __name__ == "__main__":
     main()

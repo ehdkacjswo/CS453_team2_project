@@ -37,10 +37,6 @@ def doam_cross(output, leaf_ind, special, args):
 	else:
 		children.append(doam_mut(copy.deepcopy(pair[0][0]), special, 1.0, args.alpha, args.beta))
 		children.append(doam_mut(copy.deepcopy(pair[1][0]), special, 1.0, args.alpha, args.beta))
-			
-	# Secant method
-	'''if score1 != score2:
-		children.append([round((pair[0][0][i] * (score2 + 1) - pair[1][0][i] * (score1 + 1)) / (score2 - score1)) for i in range(len(pair[0][0]))])'''
 	
 	# Dnn help
 	if args.use_dnn:

@@ -13,7 +13,7 @@ from dnn.nn_train import guided_mutation, train_one_iter
 import torch
 import torch.optim as optim
 
-class InputGenerator:
+class TestGenerator:
 	def __init__(self, 
 			p, gen, pm_percent,
 			niter, lr, no_cuda, step_size, seed, model_dir):
@@ -67,12 +67,12 @@ class InputGenerator:
 				else:
 					inp.append(rand.randint(-10000, 10000))
 			
-			rt = add_test(rt, inp)
+			add_test(rt, inp)
 
 		return special, rt
 
 	# Analyze the fitness output
-	def get_result(self, leaf_index):
+	def get_result(self):
 		f = open(self.br_file, "r")
 		br_data = f.readlines()
 		f.close()
@@ -98,7 +98,7 @@ class InputGenerator:
 		br_fit = {}
 
 		# For each leaves, find fitness
-		for leaf_ind, lvl_dict in leaf_index.items():
+		for leaf_ind, lvl_dict in self.leaf_index.items():
 			for ind, lvl in sorted(lvl_dict.items(), key=lambda tup: tup[1]):
 				dist = br_dict.get(ind)
 
@@ -122,6 +122,61 @@ class InputGenerator:
 				br_fit[leaf_ind] = len(lvl_dict) + 1
 
 		return br_fit
+
+	# Learn new test and train dnn
+	# Returns true if
+	def test_and_learn(self, new_test):
+		new_output = []
+		sol_found = False
+
+		# input and fitness for dnn
+		if self.args.use_dnn:
+			dnn_inp = {}
+			dnn_fit = {}
+
+			for leaf_ind in self.leaf_index:
+				dnn_inp[leaf_ind] = []
+				dnn_fit[leaf_ind] = []
+
+		for inp in new_test:
+			# Don't print anything
+			with self.HiddenPrint():
+				with open(self.br_file, 'w') as br_report:
+					try:
+						self.method(br_report, *inp)
+					except:
+						# Exception detected, do nothing
+						pass
+
+			new_output.append((inp, self.get_result()))
+
+			# Check whether the solution is found
+			for leaf_ind in self.leaf_index:
+				# When the test is found for leaf
+				if new_output[-1][1][leaf_ind] < 0:
+					del self.leaf_index[leaf_ind]
+
+					print(leaf_ind, inp)
+						
+					if not bool(self.leaf_index):
+						sol_found = True
+					break
+
+			if sol_found:
+				break
+
+			if self.args.use_dnn:
+				for leaf_ind in self.leaf_index:
+					dnn_inp[leaf_ind].append(new_output[-1][0])
+					dnn_fit[leaf_ind].append([new_output[-1][1][leaf_ind]])
+
+		if self.args.use_dnn and (not sol_found):
+			for leaf_ind in self.leaf_index:
+				for j in range(self.niter):
+					if train_one_iter(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args) < 1:
+						break
+
+		return new_output, sol_found
 
 	# Helps to suppress print
 	class HiddenPrint:
@@ -150,18 +205,12 @@ class InputGenerator:
 		branch.br_list = [None]
 		find_if(func.body, 0, self.args, True)
 		
-		print('{} branches found'.format(len(branch.br_list) - 1))
-		
 		# No branches found
 		if len(branch.br_list) == 1:
 			return
 		
-		'''for cur_br in branch.br_list[1:]:
-			print('Branch #{} on line {}'.format(cur_br.ind, cur_br.lineno))'''
-
 		# Generate input
 		special, new_test = self.gen_input(func)
-		print(special)
 
 		# Change function name and Import original function
 		func.name = self.new_func_name
@@ -175,7 +224,7 @@ class InputGenerator:
 		source_file.close()
 
 		# Get index of leaf branches (ind, app_lvl)
-		leaf_index = {}
+		self.leaf_index = {}
 
 		for cur_br in branch.br_list[1:]:
 			# At least one of branches is leaf
@@ -194,30 +243,25 @@ class InputGenerator:
 				if not cur_br.true:
 					pos_dict = copy.deepcopy(lvl_dict)
 					pos_dict[cur_br.ind] = 0
-					leaf_index[cur_br.ind] = pos_dict
+					self.leaf_index[cur_br.ind] = pos_dict
 				if not cur_br.false:
 					neg_dict = copy.deepcopy(lvl_dict)
 					neg_dict[-cur_br.ind] = 0
-					leaf_index[-cur_br.ind] = neg_dict
+					self.leaf_index[-cur_br.ind] = neg_dict
 		
 		# Used for final printing
-		leaf_index_copy = copy.deepcopy(leaf_index)
+		leaf_index_copy = copy.deepcopy(self.leaf_index)
 
 		# DNN init
 		if self.args.use_dnn:
 			self.args.input_dim = len(func.args.args) - 1
 			self.args.dnn = {}
-			'''self.args.model = MLP(self.args.input_dim + len(leaf_index)).to(self.args.device)
-			self.args.optimizer = optim.SGD(self.args.model.parameters(), lr=self.lr)
-			one_hot = list(leaf_index.keys())'''
 		
 		# Branch fitness output with(test, output)
 		output = {}
 		last_best = {}
-		dnn_inp = {}
-		dnn_fit = {}
 
-		for leaf_ind in leaf_index:
+		for leaf_ind in self.leaf_index:
 			output[leaf_ind] = []
 
 			# (Best fitness, number of generation passed) for each leaves
@@ -227,144 +271,117 @@ class InputGenerator:
 				model = MLP(self.args.input_dim).to(self.args.device)
 				opt = optim.SGD(model.parameters(), lr=self.lr)
 				self.args.dnn[leaf_ind] = (model, opt)
-
-				dnn_inp[leaf_ind] = []
-				dnn_fit[leaf_ind] = []
 		
 		# Import revised code
 		module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
-		method = getattr(module, self.new_func_name)
+		self.method = getattr(module, self.new_func_name)
 		
-		# Tests that cover each leaves
-		leaf_test = {}
+		# Index of coverd leaves
+		self.leaf_cover = []
 		sol_found = False
 
 		# Return value (gen, # of br, # of br passed)
 		rt = []
 
-		print(leaf_index.keys())
-
+		print(self.leaf_index.keys())
+		
 		t = 0.5
 		a = 0.9
 		b = 0.0001
 
+		new_output, sol_found = self.test_and_learn(new_test)
+		use_approx = False
+
 		for i in range(self.gen):
+			print(i)
 			self.args.step_size = t
 			t = t * a + b
-			#print(i, leaf_index.keys())
-			new_output = []
-			# Input and fitness for dnn
-			'''dnn_inp = {}
-			dnn_fit = {}'''
-
-			# Test each inputs
-			for inp in new_test:
-				# Don't print anything
-				with self.HiddenPrint():
-					with open(self.br_file, 'w') as br_report:
-						try:
-							method(br_report, *inp)
-						except:
-							# Exception detected, do nothing
-							pass
-
-				new_output.append((inp, self.get_result(leaf_index)))
-
-				# Check whether the solution is found
-				for leaf_ind in leaf_index:
-					# When the test is found for leaf
-					if new_output[-1][1][leaf_ind] < 0:
-						leaf_test[leaf_ind] = copy.deepcopy(inp)
-						del leaf_index[leaf_ind]
-
-						print(i, leaf_ind, leaf_test[leaf_ind])
-						
-						if not bool(leaf_index):
-							sol_found = True
-						break
-
-				if sol_found:
+			
+			if not use_approx:
+				# Solution found or last generation
+				if sol_found or i == self.gen - 1:
+					rt.append(i + 1)
 					break
 
-				if self.args.use_dnn:
-					for leaf_ind in leaf_index:
-						dnn_inp[leaf_ind].append(new_output[-1][0])
-						dnn_fit[leaf_ind].append([new_output[-1][1][leaf_ind]])
-						#dnn_inp.append(new_output[-1][0] + [0 if leaf_ind != ind else 1 for ind in one_hot])
-						#dnn_fit.append([new_output[-1][1][leaf_ind]])
+				new_test = []
+				last_test_num = 0
+				pop_per_leaf = (self.p + len(self.leaf_index) - 1) / len(self.leaf_index)
 
-			# Solution found or last generation
-			if sol_found or i == self.gen - 1:
-				rt.append(i + 1)
-				break
-
-			new_test = []
-			last_test_num = 0
-			pop_per_leaf = (self.p + len(leaf_index) - 1) / len(leaf_index)
+				ind_del = []
 			
-			if self.args.use_dnn:
-				for leaf_ind in leaf_index:
-					for j in range(self.niter):
-						if train_one_iter(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args) < 1:
-							break
-						'''if j == 99:
-							print(train_one_iter(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args))'''
+				for leaf_ind in self.leaf_index:
+					save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+					output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
 
-					dnn_inp[leaf_ind].clear()
-					dnn_fit[leaf_ind].clear()
+					if abs(last_best[leaf_ind][0] - output[leaf_ind][0][1][leaf_ind]) < 1e-6:
+						last_best[leaf_ind][1] += 1
 
-			ind_del = []
-			
-			for leaf_ind in leaf_index:
-				save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+						if last_best[leaf_ind][1] >= 5:
+							ind_del.append(leaf_ind)
+							continue
 
-				if abs(last_best[leaf_ind][0] - output[leaf_ind][0][1][leaf_ind]) < 1e-6:
-					last_best[leaf_ind][1] += 1
+					else:
+						last_best[leaf_ind][1] = 0
 
-					if last_best[leaf_ind][1] >= 5:
-						ind_del.append(leaf_ind)
-						continue
+					last_best[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
 
-				else:
-					last_best[leaf_ind][1] = 0
-
-				last_best[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
-
-				
-				'''if self.args.use_dnn:
-					self.args.one_hot_vec = [0 if leaf_ind != ind else 1 for ind in one_hot]'''
-
-				# Generate test case until p tests
-				while len(new_test) - last_test_num < pop_per_leaf:
-					children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
-
-					for child in children:
-						child_found = False
-
+					# Generate test case until p tests
+					while len(new_test) - last_test_num < pop_per_leaf:
+						children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
+						
 						# Check whether the child is already in test case
-						for sub_leaf_ind in leaf_index:
-							if in_test([out[0] for out in output[sub_leaf_ind]], child):
+						for child in children:
+							child_found = False
+							
+							for sub_leaf_ind in self.leaf_index:
+								if in_test([out[0] for out in output[leaf_ind]], child):
+									child_found = True
+									break
+
+							if not child_found:
+								add_test(new_test, child)
+
+					last_test_num = len(new_test)
+
+				for ind in ind_del:
+					del self.leaf_index[ind]
+
+				if not bool(self.leaf_index):
+					rt.append(i+1)
+					break
+
+				new_output, sol_found = self.test_and_learn(new_test)
+
+			# Use approximation
+			else:
+				'''for leaf_ind in self.leaf_index:
+					new_output = []
+
+					for test in  
+
+					child = guided_mutation(
+						children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
+
+						for child in children:
+							if in_test([out[0] for out in output[leaf_ind]], child):
 								child_found = True
 								break
 
-							if not child_found:
-								new_test = add_test(new_test, child)
+						if not child_found:
+							add_test(new_test, child)
 
-				last_test_num = len(new_test)
+					new_output = []
+					
+					for test in new_test:'''
 
-			for ind in ind_del:
-				del leaf_index[ind]
-
-			if not bool(leaf_index):
-				rt.append(i+1)
-				break
-
+				pass
+				
 		# Set of braches coverd
 		br_pass = set()
 
 		for leaf_ind, lvl_dict in leaf_index_copy.items():
 			# Solution found for leaf
-			if leaf_ind in leaf_test:
+			if leaf_ind not in self.leaf_index:
 				for parent in lvl_dict:
 					br_pass.add(parent)
 					
@@ -382,12 +399,12 @@ class InputGenerator:
 
 		# Delete trashes
 		del module
-		del method
+		del self.method
 
-		'''if os.path.exists(func_file_name):
+		if os.path.exists(func_file_name):
 			os.remove(func_file_name)
 		if os.path.exists(self.br_file):
-			os.remove(self.br_file)'''
+			os.remove(self.br_file)
 
 		return rt
 
@@ -415,39 +432,3 @@ class InputGenerator:
 
 		# [generation, total branch, passed branch, time]
 		return rt
-
-	'''
-	root = astor.code_to_ast.parse_file(args.py_file)
-	
-	# Apply not used variable name for output file and temp var
-	var_len = name_len(root.body) + 1
-	file_name = 'f' * var_len
-	temp_name = 't' * var_len
-	new_func_name = 'f' * (var_len + 1)
-
-	# NN setting
-	use_cuda = not args.no_cuda and torch.cuda.is_available()
-	device = torch.device("cuda" if use_cuda else "cpu")
-
-	# Size of population
-	p = args.p if args.p > 0 else 100
-	save_p = int(math.floor(float(p) * (args.ps if args.ps in range(0, 51) else 10) / 100))
-	
-	# Number of generations
-	gen = args.gen if args.gen > 0 else 1000
-	pm = args.pm if args.pm in range(0, 101) else 20
-	pm = float(pm) / 100
-
-	# Gamma distribution
-	alpha = args.alpha if args.alpha > 0 else 1
-	beta = args.beta if args.beta > 0 else 1
-	
-	# File names
-	func_file = args.func
-	br_file = args.br
-	input_dim = get_input_dim(func_file)
-
-	for ind in range(len(root.body)):
-		model = MLP(input_dim + var_len).to(device)
-		optimizer = optim.SGD(model.parameters(), lr=args.lr)
-		test = test_main(copy.deepcopy(root), ind, func_file + str(ind) + '.py')'''

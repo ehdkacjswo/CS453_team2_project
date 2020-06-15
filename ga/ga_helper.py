@@ -22,7 +22,7 @@ def in_test(test_list, new_test):
 
 # If non of given test is identical to new test, add it
 def add_test(test_list, new_test):
-	if in_test(test_list, new_test):
-		return test_list
+	if not in_test(test_list, new_test):
+		test_list.append(new_test)
 	
-	return test_list + [new_test]
+	return
