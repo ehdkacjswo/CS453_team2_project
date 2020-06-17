@@ -17,8 +17,8 @@ class MLP(nn.Module):
 		z = nn.ReLU()(z)
 		z = self.layer2(z)
 		z = nn.ReLU()(z)
-		z = self.layer3(z)
-		z = nn.Tanh()(z)
+		#z = self.layer3(z)
+		#z = nn.ReLU()(z)
 		out = self.layer4(z)
 
 		return out

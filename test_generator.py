@@ -148,7 +148,7 @@ class TestGenerator:
 						# Exception detected, do nothing
 						pass
 
-			new_output.append((inp, self.get_result()))
+			new_output.append([inp, self.get_result()])
 
 			# Check whether the solution is found
 			for leaf_ind in self.leaf_index:
@@ -173,8 +173,9 @@ class TestGenerator:
 
 		if self.args.use_dnn and (not sol_found):
 			for leaf_ind in self.leaf_index:
-				for j in range(self.niter):
-					if train_one_iter(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args) < 1:
+				for j in range(500):
+					aaa = train_one_iter(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args)
+					if aaa < 1:
 						break
 
 		return new_output, sol_found
@@ -270,7 +271,7 @@ class TestGenerator:
 
 			if self.args.use_dnn:
 				model = MLP(self.args.input_dim).to(self.args.device)
-				opt = optim.SGD(model.parameters(), lr=self.lr)
+				opt = optim.AdamW(model.parameters(), lr=self.lr)
 				self.args.dnn[leaf_ind] = (model, opt)
 		
 		# Import revised code
@@ -309,7 +310,9 @@ class TestGenerator:
 			self.args.step_size = t
 			t = t * a + b
 			
-			if not use_approx:
+			# Don't use fitness approximation
+			if not use_approx or not self.args.use_dnn:
+				print('not using approximation')
 				#use_approx = True
 				new_test = []
 				last_test_num = 0
@@ -335,7 +338,7 @@ class TestGenerator:
 					
 					# When we use approximation on next generation
 					# Add gradient descent of first save_p tests
-					if use_approx:
+					'''if use_approx:
 						for test in [out[0] for out in output[leaf_ind][:self.save_p]]:
 							child = guided_mutation([test], leaf_ind, self.args).tolist()[0]
 							child_found = False
@@ -346,7 +349,7 @@ class TestGenerator:
 									break
 							
 							if not child_found:
-								add_test(new_test, child)
+								add_test(new_test, child)'''
 					
 					last_test_num = len(new_test)
 				
@@ -369,7 +372,9 @@ class TestGenerator:
 						last_best[leaf_ind][1] += 1
 
 						if last_best[leaf_ind][1] >= 5:
-							ind_del.append(leaf_ind)
+							#ind_del.append(leaf_ind)
+							use_approx = True
+							last_best[leaf_ind][1] = 0
 							continue
 
 					else:
@@ -384,14 +389,32 @@ class TestGenerator:
 					rt.append(i + 1)
 					break
 
+				if use_approx and self.args.use_dnn:
+					for leaf_ind in self.leaf_index:
+						new_test = []
+
+						for test in [out[0] for out in output[leaf_ind][:self.save_p]]:
+							child = guided_mutation([test], leaf_ind, self.args).tolist()[0]
+							child = [int(inp) for inp in child]
+
+							if not in_test([out[0] for out in output[leaf_ind]], child):
+								add_test(new_test, child)
+						
+						for test in new_test:
+							output[leaf_ind].append([test, {leaf_ind : forward([test], leaf_ind, self.args)}])
+
+
 			# Use approximation
 			else:
+				i -= 1
+				print('using approximation')
 				for leaf_ind in self.leaf_index:
 					new_test = []
 
 					# Get 
 					for test in  [out[0] for out in output[leaf_ind][self.save_p:]]:
 						child = guided_mutation([test], leaf_ind, self.args).tolist()[0]
+						child = [int(inp) for inp in child]
 
 						if not in_test([out[0] for out in output[leaf_ind]], child):
 							add_test(new_test, child)
@@ -399,14 +422,32 @@ class TestGenerator:
 					new_output = []
 					
 					for test in new_test:
-						new_output.append((test, {leaf_ind : forward([test], leaf_ind, self.args)}))
-
+						new_output.append([test, {leaf_ind : forward([test], leaf_ind, self.args)}])
+			
 						# Found deeper case
 						if new_output[-1][1][leaf_ind] < math.floor(output[leaf_ind][0][1][leaf_ind]):
 							use_approx = False
-					
 
-				pass
+					save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+
+				# Get accurate fitness for new test
+				if not use_approx:
+					i += 1
+
+					new_test = []
+
+					for leaf_ind in self.leaf_index:
+						for ind in range(self.save_p, len(output[leaf_ind])):
+							with self.HiddenPrint():
+								with open(self.br_file, 'w') as br_report:
+									try:
+										self.method(br_report, *output[leaf_ind][ind][0])
+									except:
+										pass
+
+							output[leaf_ind][ind][1] = self.get_result()
+
+						output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
 				
 		# Set of braches coverd
 		br_pass = set()

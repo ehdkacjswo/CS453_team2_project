@@ -12,23 +12,26 @@ def guided_mutation(inputs, leaf_ind, args):
 	org_input = inputs_var.detach()
 	grad = gradient.detach()
 
-	if torch.norm(grad) == 0:
+	'''if torch.norm(grad) == 0:
 		return org_input[:, :args.input_dim].round()
 		
-	mutated_input = org_input - grad / torch.norm(grad) * 0.1 * torch.norm(org_input)
+	mutated_input = org_input - grad / torch.norm(grad) * 0.1 * torch.norm(org_input)'''
+	mutated_input = org_input - grad * 10000
 	return mutated_input[:, :args.input_dim].round()
 
 def train_one_iter(inputs, fitness, leaf_ind, args):
 	inputs_var = torch.Tensor(inputs).to(args.device)
 	target_var = torch.Tensor(fitness).to(args.device)
-		
+
+	args.dnn[leaf_ind][0].train()	
 	pred = args.dnn[leaf_ind][0](inputs_var)
 	#loss = nn.MSELoss()(pred, target_var.unsqueeze(1))
 	loss = nn.MSELoss()(pred, target_var)
 	
-	args.dnn[leaf_ind][1].zero_grad()
 	loss.backward()
 	args.dnn[leaf_ind][1].step()
+	args.dnn[leaf_ind][1].zero_grad()
+	#print(loss.item())
 
 	'''print("[{}/{}]: loss={}".format(iter_num, args.niter, loss.item()))'''
 	return loss.item()
@@ -37,4 +40,4 @@ def forward(inputs, leaf_ind, args):
 	inputs_var = torch.Tensor(inputs).to(args.device)
 	pred = args.dnn[leaf_ind][0](inputs_var)
 
-	return pred.item()
+	return pred.detach().item()

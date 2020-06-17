@@ -1,7 +1,7 @@
 import random as rand
 import math, torch, copy
 from ga.mutation import doam_mut
-from dnn.nn_train import guided_mutation
+from dnn.nn_train import guided_mutation, forward
 
 def doam_cross(output, leaf_ind, special, args):
 	pair = []
