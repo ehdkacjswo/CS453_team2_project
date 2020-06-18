@@ -18,7 +18,9 @@ def guided_mutation(inputs, leaf_ind, args):
 		return org_input[:, :args.input_dim].round()
 		
 	mutated_input = org_input - grad / torch.norm(grad) * 0.1 * torch.norm(org_input)'''
-    mutated_input = org_input - grad * 10000
+    mutated_input = org_input - grad * 1e6
+    aaa = grad * 1e6
+    print(aaa.round())
     return mutated_input[:, :args.input_dim].round()
 
 

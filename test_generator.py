@@ -182,10 +182,11 @@ class TestGenerator:
 
         if self.args.use_dnn and (not sol_found):
             for leaf_ind in self.leaf_index:
-                for j in range(10000):
+                for j in range(200):
                     aaa = train_one_iter(
                         dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args)
-                    if aaa < 0.5 or j == 9999:
+                    if aaa < 0.1:
+                        #print(leaf_ind, j, aaa)
                         break
 
         return new_output, del_ind, sol_found
@@ -280,7 +281,7 @@ class TestGenerator:
 
             if self.args.use_dnn:
                 model = MLP(self.args.input_dim).to(self.args.device)
-                opt = optim.AdamW(model.parameters(), lr=self.lr)
+                opt = optim.SGD(model.parameters(), lr=self.lr)
                 self.args.dnn[leaf_ind] = (model, opt)
 
         # Import revised code
@@ -312,44 +313,65 @@ class TestGenerator:
 
         for i in range(self.gen):
             print(i)
-
             # Leaf indexes from approximation mode to normal mode
             approx_to_normal = set()
 
             # Offspring generation (approx case)
             for leaf_ind in list(approx):
                 new_test = []
-                move_to_normal = False
 
-                # Generate gradient descent mutant
-                for test in [out[0] for out in output[leaf_ind]] + [out[0] for out in grad[leaf_ind]]:
-                    child = guided_mutation(
-                        [test], leaf_ind, self.args).tolist()[0]
+                for test in [out[0] for out in output[leaf_ind]]:
+                    child = guided_mutation([test], leaf_ind, self.args).tolist()[0]
                     child = [int(inp) for inp in child]
 
-                    if not in_test([out[0] for out in grad[leaf_ind]], child):
-                        add_test(new_test, child)
+                    if rand.random() < self.args.pm or child == test:
+                        child = doam_mut(child, special, self.args.pm, self.args.alpha, self.args.beta)
 
-                new_output = []
+                    add_test(new_test, child)
 
-                for test in new_test:
-                    new_output.append(
-                        [test, {leaf_ind: forward([test], leaf_ind, self.args)}])
+                for j in range(10):
+                    # Deeper case found or 
+                    found_deeper = False
+                    get_better = False
 
-                    # Found deeper case
-                    if new_output[-1][1][leaf_ind] < approx[leaf_ind][0] or new_output[-1][1][leaf_ind] <= 0:
-                        move_to_normal = True
+                    # Generate gradient descent mutant
+                    for test in [out[0] for out in grad[leaf_ind]]:
+                        child = guided_mutation(
+                            [test], leaf_ind, self.args).tolist()[0]
+                        child = [int(inp) for inp in child]
 
-                if not move_to_normal:
-                    approx[leaf_ind][1] += 1
+                        # Mutate
+                        if rand.random() < self.args.pm or child == test:
+                            child = doam_mut(child, special, self.args.pm, self.args.alpha, self.args.beta)
+
+                        if not in_test([out[0] for out in grad[leaf_ind]], child):
+                            add_test(new_test, child)
+
+                    new_output = []
+
+                    for test in new_test:
+                        new_output.append(
+                            [test, {leaf_ind: forward([test], leaf_ind, self.args)}])
+
+                        # Found deeper case
+                        if new_output[-1][1][leaf_ind] < approx[leaf_ind][0] or new_output[-1][1][leaf_ind] <= 0:
+                            found_deeper = True
+
+                        # Found better case
+                        if grad[leaf_ind] and new_output[-1][1][leaf_ind] <= grad[leaf_ind][0][1][leaf_ind] - 1e-4:
+                            get_better = True
                 
-                # Deeper case found or haven't found for some gen
-                if move_to_normal or not new_test or approx[leaf_ind][1] >= 5:
-                    approx_to_normal.add(leaf_ind)
-                    del approx[leaf_ind]
-
-                else:
                     save_sel(grad, new_output, leaf_ind, self.p, self.save_p)
+                    grad[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
+                    
+                    # Deeper case found or haven't found for some gen
+                    if found_deeper or (not get_better):
+                        approx_to_normal.add(leaf_ind)
+                        del approx[leaf_ind]
+                        break
+
+                    else:
+                        new_test = []
 
             # Have to generate offspring
             if bool(approx_to_normal) or bool(normal):
@@ -408,18 +430,18 @@ class TestGenerator:
                         rt.append(i + 1)
                         break
 
-                    # Get rid of deleted leaves
+                    # Delete covered leaves
                     for ind in del_ind:
                         normal.pop(ind, None)
                         approx.pop(ind, None)
                         approx_to_normal.discard(ind)
 
-                    # Select population (normal case)
+                    # Select population
                     for leaf_ind in list(normal) + list(approx_to_normal) + list(approx):
                         save_sel(output, new_output, leaf_ind, self.p, self.save_p)
                         output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
 
-                    # Select population (approx case)
+                    # Check if deeper case is found
                     for leaf_ind in list(approx):
                         move_to_normal = False
 
