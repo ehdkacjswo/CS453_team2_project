@@ -1,0 +1,12 @@
+Metadata-Version: 1.2
+Name: gen-src
+Version: 0.0.1
+Summary: srcgen package
+Home-page: https://github.com/ehdkacjswo/CS453_team2_project/tree/struct-refactor/srcgen
+Author: Woohyun Han
+Author-email: whhan8485@kaist.ac.kr
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.6
