@@ -14,7 +14,7 @@ def main():
 	parser.add_argument('--br', type=str, help='Name of branch distance file', default='br_dist')
 
 	# Arguments for our deep learning framework
-	parser.add_argument('--niter', type=int, help="Number of iteration to be optimized", default=100)
+	parser.add_argument('--niter', type=int, help="Number of iteration to be optimized", default=1000)
 	parser.add_argument('--lr', type=float, help="Learning for optimizer", default=1e-3)
 	parser.add_argument('--no_cuda', action='store_true', default=False, help='disables CUDA training')
 	parser.add_argument('--step_size',type=float, help="Step size for guided gradient descent", default=1000)
