@@ -47,7 +47,7 @@ def doam_cross(output, leaf_ind, special, args):
     if args.use_dnn:
         for i in range(2):
             children.append(guided_mutation(
-                [pair[i][0]], leaf_ind, args).tolist()[0])
+                [pair[i][0]], args).tolist()[0])
             children[-1] = [int(inp) for inp in children[-1]]
 
     for ind in range(len(children)):

@@ -61,10 +61,8 @@ class TestGenerator:
             self.k = 1
 
     # Generarte input from function ast
-    def gen_input(self, func):
+    def gen_input(self, arg_num, special):
         rt = []
-        arg_num = len(func.args.args)
-        special = list(set(find_num(func.body) + [0, 1, -1]))
 
         while len(rt) < self.p:
             inp = []
@@ -77,7 +75,7 @@ class TestGenerator:
 
             add_test(rt, inp)
 
-        return special, rt
+        return rt
 
     # Analyze the fitness output
     def get_result(self):
@@ -133,18 +131,14 @@ class TestGenerator:
 
     # Learn new test and train dnn
     # Returns true if
-    def test_and_learn(self, new_test):
+    def test_and_learn(self, new_test, leaf_ind):
         new_output = []
         sol_found = False
 
         # Initialize input and fitness for dnn
         if self.args.use_dnn:
-            dnn_inp = {}
-            dnn_fit = {}
-
-            for leaf_ind in self.leaf_index:
-                dnn_inp[leaf_ind] = []
-                dnn_fit[leaf_ind] = []
+            dnn_inp = []
+            dnn_fit = []
 
         for inp in new_test:
             # Don't print anything
@@ -159,49 +153,39 @@ class TestGenerator:
             new_output.append((inp, self.get_result()))
 
             # Check whether the solution is found
-            for leaf_ind in list(self.leaf_index):
+            for sub_leaf_ind in list(self.leaf_index):
                 # When the test is found for leaf
-                if new_output[-1][1][leaf_ind] < 0:
-                    del self.leaf_index[leaf_ind]
-                    self.leaf_cover.append(leaf_ind)
+                if new_output[-1][1][sub_leaf_ind] < 0:
+                    del self.leaf_index[sub_leaf_ind]
+                    self.leaf_cover.append(sub_leaf_ind)
 
-                    print(leaf_ind, inp)
+                    #print(sub_leaf_ind, inp)
 
-                    if not bool(self.leaf_index):
-                        sol_found = True
+                    if sub_leaf_ind == leaf_ind:
+                        return None, None, True
+
                     break
 
-            if sol_found:
-                break
-
             if self.args.use_dnn:
-                for leaf_ind in self.leaf_index:
-                    dnn_inp[leaf_ind].append(new_output[-1][0])
-                    dnn_fit[leaf_ind].append([new_output[-1][1][leaf_ind]])
-
-        # Number of leaves that dnn converges (loss < 0.1)
-        conv_leaf = 0
+                dnn_inp.append(new_output[-1][0])
+                dnn_fit.append([new_output[-1][1][leaf_ind]])
 
         if self.args.use_dnn and (not sol_found):
-            for leaf_ind in self.leaf_index:
-                epoch, loss = train(dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args)
+            epoch, loss = train(dnn_inp, dnn_fit, self.args)
+            print(epoch, loss)
+            if loss < 0.2:
+                return new_output, True, False
+            else:
+                return new_output, False, False
 
-                if loss < 0.2:
-                    conv_leaf += 1
-
-        return new_output, conv_leaf, sol_found
+        return new_output, False, False
 
     # Approximate fitness using model
-    def approx(self, new_test):
+    def approx(self, new_test, leaf_ind):
         new_output = []
 
         for test in new_test:
-            fit_dict = {}
-
-            for leaf_ind in self.leaf_index:
-                fit_dict[leaf_ind] = forward(test, leaf_ind, self.args)
-
-            new_output.append((test, fit_dict))
+            new_output.append((test, {leaf_ind : forward(test, leaf_ind, self.args)}))
 
         return new_output
 
@@ -237,7 +221,9 @@ class TestGenerator:
             return
 
         # Generate input
-        special, new_test = self.gen_input(func)
+        special = list(set(find_num(func.body) + [-1, 0, 1]))
+        arg_num = len(func.args.args)
+        new_test = self.gen_input(arg_num, special)
 
         # Change function name and Import original function
         func.name = self.new_func_name
@@ -282,23 +268,14 @@ class TestGenerator:
 
         # DNN init
         if self.args.use_dnn:
-            self.args.input_dim = len(func.args.args) - 1
+            self.args.input_dim = arg_num
             self.args.dnn = {}
 
         # Branch fitness output with(test, output)
         output = {}
-        last_best = {}
 
         for leaf_ind in self.leaf_index:
             output[leaf_ind] = []
-
-            # (Best fitness, number of generation passed) for each leaves
-            last_best[leaf_ind] = [-1, 0]
-
-            if self.args.use_dnn:
-                model = MLP(self.args.input_dim).to(self.args.device)
-                opt = optim.AdamW(model.parameters(), lr=0.01)
-                self.args.dnn[leaf_ind] = (model, opt)
 
         # Import revised code
         module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
@@ -308,63 +285,67 @@ class TestGenerator:
         self.leaf_cover = []
         sol_found = False
 
+        # Branch fitness output with(test, output)
+        output = {}
+
+        for leaf_ind in self.leaf_index:
+            output[leaf_ind] = []
+
         # Return value (gen, # of br, # of br passed)
         rt = []
 
         print(self.leaf_index.keys())
 
-        # Population initialization
-        new_output, conv_leaf, sol_found = self.test_and_learn(new_test)
+        for leaf_ind in list(self.leaf_index):
+            print(leaf_ind)
 
-        if sol_found:
-            return [0, 2 * (len(branch.br_list) - 1), 2 * (len(branch.br_list) - 1)]
+            approx_gen = 0
 
-        for leaf_ind in self.leaf_index:
-            save_sel(output, new_output, leaf_ind, self.p, self.save_p)
-            output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
+            if leaf_ind not in self.leaf_index:
+                continue
 
-        use_approx = True if conv_leaf == len(self.leaf_index) else False
-        approx_gen = 0
+            if self.args.use_dnn:
+                self.args.model = MLP(arg_num).to(self.args.device)
+                self.args.opt = optim.AdamW(self.args.model.parameters(), lr=1e-3)
 
-        for i in range(self.gen):
-            use_approx = False
-            print(i)
+            new_test = self.gen_input(arg_num, special)
+            new_output, conv, sol_found = self.test_and_learn(new_test, leaf_ind)
+            output[leaf_ind] = new_output
 
-            print(use_approx)
+            if sol_found:
+                continue
 
-            #use_approx = True
-            new_test = []
-            last_test_num = 0
-            pop_per_leaf = (self.p + len(self.leaf_index) - 1) / len(self.leaf_index)
+            use_approx = True if conv else False
+            
+            for i in range(self.gen):
+                print(i)
 
-            # Create new test cases
-            for leaf_ind in self.leaf_index:
+                print(use_approx)
+
+                #use_approx = True
+                new_test = []
+                last_test_num = 0
+    
                 # Generate test case until p tests
-                while len(new_test) - last_test_num < pop_per_leaf:
+                while len(new_test) < self.p:
                     children = doam_cross(output[leaf_ind], leaf_ind, special, self.args)
 
                     # Check whether the child is already in test case
                     for child in children:
                         child_found = False
 
-                        for sub_leaf_ind in self.leaf_index:
-                            if in_test([out[0] for out in output[sub_leaf_ind]], child):
-                                child_found = True
-                                break
+                        if in_test([out[0] for out in output[leaf_ind]], child):
+                            continue
+                        
+                        add_test(new_test, child)
 
-                        if not child_found:
-                            add_test(new_test, child)
+                if use_approx:
+                    approx_gen += 1
+                    deep_leaf = False
+                    fit_conv = False
 
-                last_test_num = len(new_test)
-
-            '''if use_approx:
-                approx_gen += 1
-                deep_leaf = False
-                fit_leaf = 0
-
-                new_output = self.approx(new_test)
+                    new_output = self.approx(new_test, leaf_ind)
                 
-                for leaf_ind in self.leaf_index:
                     org_best = output[leaf_ind][0][1][leaf_ind]
                     last_best = org_best if approx_gen == 1 else output[leaf_ind][self.save_p][1][leaf_ind]
 
@@ -379,61 +360,43 @@ class TestGenerator:
                     # Fitness converges
                     #print(leaf_ind, cur_best, last_best)
                     if cur_best >= last_best or abs(cur_best - last_best) < 1e-1:
-                        fit_leaf += 1
+                        fit_conv = True
 
-                print(deep_leaf, fit_leaf, len(self.leaf_index))
+                    # Found deeper case or fitness converges for every leaves
+                    # Or last generation
+                    if deep_leaf or fit_conv or i == self.gen - 1:
+                        if leaf_ind == -6:
+                            print(deep_leaf, fit_conv)
+                        use_approx = False
+                        new_test = [out[0] for out in output[leaf_ind][self.save_p:]]
+                        output[leaf_ind] = output[leaf_ind][:self.save_p]
 
-                # Found deeper case or fitness converges for every leaves
-                # Or last generation
-                if deep_leaf or fit_leaf == len(self.leaf_index) or i == self.gen - 1:
-                    use_approx = False
-                    new_test = []
-                    last_test_num = 0
+                if not use_approx:
+                    approx_gen = 0
+                    new_output, conv, sol_found = self.test_and_learn(new_test, leaf_ind)
 
-                    for leaf_ind in self.leaf_index:
-                        for child in [out[0] for out in output[leaf_ind][self.save_p:]]:
-                            child_found = False
+                    if sol_found or i == self.gen - 1:
+                        rt.append(i + 1)
+                        break
 
-                            for sub_leaf_ind in self.leaf_index:
-                                if in_test([out[0] for out in output[sub_leaf_ind][:self.save_p]], child):
-                                    child_found = True
-                                    break
+                    # Number of leaves that fitness converges
+                    fit_leaf = 0
 
-                            if not child_found:
-                                add_test(new_test, child)
-
-                            if len(new_test) - last_test_num >= pop_per_leaf:
-                                break
-
-                        last_test_num = len(new_test)
-                        output[leaf_ind] = output[leaf_ind][:self.save_p]'''
-
-            if not use_approx:
-                approx_gen = 0
-
-                new_output, conv_leaf, sol_found = self.test_and_learn(new_test)
-
-                if sol_found or i == self.gen - 1:
-                    rt.append(i + 1)
-                    break
-
-                # Number of leaves that fitness converges
-                fit_leaf = 0
-
-                # Select population
-                for leaf_ind in self.leaf_index:
+                    # Select population
                     save_sel(output, new_output, leaf_ind, self.p, self.save_p)
                     last_best = output[leaf_ind][0][1][leaf_ind]
 
                     output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
                     cur_best = output[leaf_ind][0][1][leaf_ind]
 
-                    '''# Fitness doesn't change much
-                    if abs(last_best - cur_best) < 1e-1:
-                        fit_leaf += 1'''
+                    print(last_best, cur_best)
 
-                '''if conv_leaf == len(self.leaf_index) or fit_leaf == len(self.leaf_index):
-                    use_approx = True'''
+                    # Fitness doesn't change much
+                    if abs(last_best - cur_best) < 1e-1:
+                        fit_conv = True
+
+                    if conv or fit_conv:
+                        use_approx = True
 
         # Set of braches coverd
         br_pass = set()
