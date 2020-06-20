@@ -1,9 +1,9 @@
 import ast
 import random
 
-from variable import generate_variable_name
-from expression import make_node_expression
-from block import make_node_block
+from gen_src.variable import generate_variable_name
+from gen_src.expression import make_node_expression
+from gen_src.block import make_node_block
 
 def make_node_function_def(max_depth=None, num_body_statements=None):
     vctx = set()

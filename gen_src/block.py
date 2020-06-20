@@ -2,8 +2,8 @@ import ast
 import random
 import copy
 
-from expression import make_node_expression, make_node_test_expression
-from statement import make_node_assign, make_node_loop_end, make_node_pass
+from gen_src.expression import make_node_expression, make_node_test_expression
+from gen_src.statement import make_node_assign, make_node_loop_end, make_node_pass
 
 def make_node_block(vctx, max_depth=None, block_pass=True, num_statements=None):
     if num_statements is None and block_pass and random.choice([True] + [False] * 10):
