@@ -4,11 +4,13 @@ import glob
 from gen_src.srcgen import src_gen
 
 PYTHON_CMD = 'python'
+RUN_PER_FILE = 1
 
 def run_test_generator(py_file_path):
     main_path = os.path.join(os.getcwd(), 'main.py')
     cmd = '{} {} {}'.format(PYTHON_CMD, main_path, py_file_path)
-    os.system(cmd)
+    for _ in range(RUN_PER_FILE):
+        os.system(cmd)
 
 def eval_with_gen_src():
     gen_src_dir = 'gen_src'
@@ -35,7 +37,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--file_name', type=str, help='File name in manual_src to run.', default=None)
     parser.add_argument('-g', '--gen_src_count', type=int, help='Number of automatically generated source to run.', default=0)
+    parser.add_argument('-n', '--run_per_file', type=int, help='Number of runs per single test file.', default=1)
     args = parser.parse_args()
+
+    RUN_PER_FILE = args.run_per_file
 
     if args.file_name is not None:
         eval_with_manual_src_file(args.file_name)
