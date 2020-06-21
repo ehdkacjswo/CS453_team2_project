@@ -8,7 +8,7 @@ def main():
     parser.add_argument(
         '--p', type=int, help='Number of population', default=100)
     parser.add_argument('--gen', type=int,
-                        help='Number of generation', default=50)
+                        help='Number of generation', default=100)
     parser.add_argument(
         '--pm', type=int, help='Probability of mutation in percentage', default=20)
     parser.add_argument(
@@ -24,13 +24,13 @@ def main():
 
     # Arguments for our deep learning framework
     parser.add_argument('--niter', type=int,
-                        help="Number of iteration to be optimized", default=500)
+                        help="Number of iteration to be optimized", default=1000)
     parser.add_argument('--lr', type=float,
                         help="Learning for optimizer", default=1e-3)
     parser.add_argument('--no_cuda', action='store_true',
                         default=False, help='disables CUDA training')
     parser.add_argument('--step_size', type=float,
-                        help="Step size for guided gradient descent", default=1e8)
+                        help="Step size for guided gradient descent", default=1e6)
     parser.add_argument('--seed', type=int, help='random seed', default=2)
     parser.add_argument(
         '--model-dir', help='model save directory', default='./ckpt')

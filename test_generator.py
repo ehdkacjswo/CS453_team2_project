@@ -152,7 +152,6 @@ class TestGenerator:
                 if new_output[-1][1][sub_leaf_ind] < 0:
                     del self.leaf_index[sub_leaf_ind]
                     self.add_dist_pop([new_output[-1]])
-                    print('solution found', sub_leaf_ind)
 
                     if sub_leaf_ind == leaf_ind:
                         return new_output, True
@@ -176,7 +175,6 @@ class TestGenerator:
 
         loss_range = 0.1 / leaf_depth
         epoch, loss = train(dnn_inp, dnn_fit, loss_range, self.args)
-        print(epoch, loss * leaf_depth)
 
         if loss < loss_range:
             return True
@@ -297,18 +295,15 @@ class TestGenerator:
         # Number of executions of program
         num_exe = 0
         self.dist_pop = []
-
-        print(self.leaf_index.keys())
+        best_lvl = {}
 
         for leaf_ind in list(self.leaf_index):
-            print(leaf_ind)
-
             if leaf_ind not in self.leaf_index:
                 continue
 
             if self.args.use_dnn:
                 self.args.model = MLP(arg_num).to(self.args.device)
-                self.args.opt = optim.AdamW(self.args.model.parameters(), lr=1e-2)
+                self.args.opt = optim.AdamW(self.args.model.parameters(), lr=1e-3)
 
             new_test = self.gen_input(arg_num, special)
             output, sol_found = self.test(new_test, leaf_ind)
@@ -323,19 +318,17 @@ class TestGenerator:
             conv = self.learn(output, leaf_ind)
 
             use_approx = True if (conv and self.use_approx) else False
-            grad = copy.deepcopy(output) if use_approx else []
+            grad = []
 
             # Generations spent on approximation, fitness converges
             approx_gen = 0
             conv_gen = 0
             
             for i in range(self.gen):
-                print('i', i)
-
                 new_test = []
                 last_test_num = 0
 
-                parent = grad if use_approx else output
+                parent = grad + output if use_approx else output
     
                 # Generate test case until p tests
                 while len(new_test) < self.p:
@@ -343,12 +336,8 @@ class TestGenerator:
 
                     # Check whether the child is already in test case
                     for child in children:
-                        child_found = False
-
-                        if in_test([out[0] for out in output], child):
-                            continue
-                        
-                        add_test(new_test, child)
+                        if not in_test([out[0] for out in parent], child):
+                            add_test(new_test, child)
 
                 # Approximation used only when using dnn
                 if self.args.use_dnn and use_approx:
@@ -358,7 +347,7 @@ class TestGenerator:
                     new_output = self.approx(new_test, leaf_ind)
                 
                     org_best = output[0][1][leaf_ind]
-                    last_best = grad[0][1][leaf_ind]
+                    last_best = grad[0][1][leaf_ind] if approx_gen > 1 else org_best
 
                     # Save first save_p tests
                     grad = save_sel(grad, new_output, leaf_ind, self.p, self.save_p)
@@ -376,40 +365,45 @@ class TestGenerator:
 
                     # Found deeper case or fitness converges
                     # Or last generation
-                    if deep_leaf or approx_gen >= 10 or conv_gen >= 6 or i == self.gen - 1:
+                    if deep_leaf or approx_gen >= 5 or conv_gen >= 3 or i == self.gen - 1:
                         use_approx = False
+                        conv_gen = 0
                         new_test = [out[0] for out in grad]
+                        self.args.step_size = self.step_size
 
                 # Without dnn, do not use approximation
                 if not self.args.use_dnn or not use_approx:
                     new_output, conv, sol_found = self.test_and_learn(new_test, leaf_ind)
                     num_exe += len(new_output)
 
-                    # Fitness converges
-                    fit_conv = False
-
                     # Select population
                     output = save_sel(output, new_output, leaf_ind, self.p, self.save_p)
                     last_best = output[0][1][leaf_ind]
 
-                    if sol_found or i == self.gen - 1:
-                        self.add_dist_pop(output)
-                        break
-
                     output.sort(key=lambda data: data[1][leaf_ind])
                     cur_best = output[0][1][leaf_ind]
 
+                    if sol_found or i == self.gen - 1:
+                        best_lvl[leaf_ind] = math.ceil(cur_best)
+                        self.add_dist_pop(output)
+                        break
+
                     # Fitness doesn't change much
                     if abs(last_best - cur_best) < 1e-4:
-                        fit_conv = True
+                        conv_gen += 1
+                        if conv_gen >= 3:
+                            self.args.step_size = self.step_size
+                        else:
+                            self.args.step_size /= 10
 
-                    if conv or fit_conv:
+                    if (conv or conv_gen > 0) and self.use_approx:
                         use_approx = True
                         approx_gen = 0
                         conv_gen = 0
+                        grad = []
                         self.args.step_size = self.step_size
-                        grad = copy.deepcopy(output)
 
+        rt = []
         rt.append(num_exe)
         
         # Set of braches coverd
@@ -422,12 +416,9 @@ class TestGenerator:
                     br_pass.add(parent)
 
             else:
-                test = output[leaf_ind][0][0]
-                best_lvl = int(math.ceil(output[leaf_ind][0][1][leaf_ind]))
-
                 for parent, lvl in lvl_dict.items():
                     # Add when only it's visited
-                    if lvl >= best_lvl:
+                    if lvl >= best_lvl[leaf_ind]:
                         br_pass.add(parent)
 
         rt.append(len(br_pass) / (2.0 * (len(branch.br_list) - 1)) * 100.0)

@@ -27,7 +27,6 @@ def train(inputs, fitness, loss_range, args):
     target_var = torch.Tensor(fitness).to(args.device)
     target_var.requires_grad_(False)
 
-    
     for epoch in range(args.niter + 1):
         args.opt.zero_grad()
         pred = args.model(inputs_var)
@@ -37,8 +36,6 @@ def train(inputs, fitness, loss_range, args):
             return epoch, loss.item()
 
         loss.backward()
-
-        #torch.nn.utils.clip_grad_norm_(args.model.parameters(), 10)
         args.opt.step()
 
 def forward(inputs, leaf_ind, args):
