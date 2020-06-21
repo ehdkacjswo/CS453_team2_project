@@ -72,7 +72,7 @@ class TestGenerator:
                 if rand.random() <= 0.2:
                     inp.append(rand.choice(special))
                 else:
-                    inp.append(rand.randint(-10000, 10000))
+                    inp.append(rand.randint(-1000, 1000))
 
             add_test(rt, inp)
 
@@ -130,15 +130,9 @@ class TestGenerator:
 
         return br_fit
 
-    # Learn new test and train dnn (Execution result, dnn converges, solution found)
-    def test_and_learn(self, new_test, leaf_ind):
+    # Testsult, dnn converges, solution found)
+    def test(self, new_test, leaf_ind):
         new_output = []
-
-        # Initialize input and fitness for dnn
-        if self.args.use_dnn:
-            dnn_inp = []
-            dnn_fit = []
-            leaf_depth = len(self.leaf_index[leaf_ind])
 
         for inp in new_test:
             # Don't print anything
@@ -157,27 +151,48 @@ class TestGenerator:
                 # When the test is found for leaf
                 if new_output[-1][1][sub_leaf_ind] < 0:
                     del self.leaf_index[sub_leaf_ind]
-                    self.leaf_cover.append(sub_leaf_ind)
-                    #add_tesself.dist_pop.extend(
+                    self.add_dist_pop([new_output[-1]])
+                    print('solution found', sub_leaf_ind)
 
                     if sub_leaf_ind == leaf_ind:
-                        return new_output, None, True
+                        return new_output, True
 
                     break
 
-            if self.args.use_dnn:
-                dnn_inp.append(new_output[-1][0])
-                dnn_fit.append([new_output[-1][1][leaf_ind] / leaf_depth])
+        return new_output, False
 
-        if self.args.use_dnn:
-            epoch, loss = train(dnn_inp, dnn_fit, 0.1 / len(self.leaf_index[leaf_ind]), self.args)
+    # Train model with given results
+    def learn(self, new_output, leaf_ind):
+        if not self.args.use_dnn:
+            return False
 
-            if loss < 0.1 / len(self.leaf_index[leaf_ind]):
-                return new_output, True, False
-            else:
-                return new_output, False, False
+        dnn_inp = []
+        dnn_fit = []
+        leaf_depth = len(self.leaf_index[leaf_ind])
 
-        return new_output, False, False
+        for out in new_output:
+            dnn_inp.append(out[0])
+            dnn_fit.append([out[1][leaf_ind] / leaf_depth])
+
+        loss_range = 0.1 / leaf_depth
+        epoch, loss = train(dnn_inp, dnn_fit, loss_range, self.args)
+        print(epoch, loss * leaf_depth)
+
+        if loss < loss_range:
+            return True
+
+        else:
+            return False
+
+    # Test and learn the given inputs
+    def test_and_learn(self, new_test, leaf_ind):
+        new_output, sol_found = self.test(new_test, leaf_ind)
+        
+        if not sol_found:
+            return new_output, self.learn(new_output, leaf_ind), sol_found
+
+        else:
+            return new_output, False, sol_found
 
     # Approximate fitness using model
     def approx(self, new_test, leaf_ind):
@@ -187,6 +202,16 @@ class TestGenerator:
             new_output.append((test, {leaf_ind : forward(test, leaf_ind, self.args) * len(self.leaf_index[leaf_ind])}))
 
         return new_output
+
+    # Add new_output to distributed population
+    def add_dist_pop(self, new_output):
+        org_len = len(self.dist_pop)
+
+        for out in new_output:
+            if not in_test([pop[0] for pop in self.dist_pop[:org_len]], out[0]):
+                self.dist_pop.append(out)
+
+        return
 
     # Helps to suppress print
     class HiddenPrint:
@@ -265,33 +290,13 @@ class TestGenerator:
         # Used for final printing
         leaf_index_copy = copy.deepcopy(self.leaf_index)
 
-        # DNN init
-        if self.args.use_dnn:
-            self.args.input_dim = arg_num
-            self.args.dnn = {}
-
-        # Branch fitness output with(test, output)
-        output = {}
-
-        for leaf_ind in self.leaf_index:
-            output[leaf_ind] = []
-
         # Import revised code
         module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
         self.method = getattr(module, self.new_func_name)
 
-        # Index of coverd leaves
-        self.leaf_cover = []
-        sol_found = False
-
-        # Branch fitness output with(test, output)
-        output = {}
-
-        for leaf_ind in self.leaf_index:
-            output[leaf_ind] = []
-
-        # Return value (gen, # of br, # of br passed)
-        rt = []
+        # Number of executions of program
+        num_exe = 0
+        self.dist_pop = []
 
         print(self.leaf_index.keys())
 
@@ -303,17 +308,22 @@ class TestGenerator:
 
             if self.args.use_dnn:
                 self.args.model = MLP(arg_num).to(self.args.device)
-                self.args.opt = optim.AdamW(self.args.model.parameters(), lr=1e-3)
+                self.args.opt = optim.AdamW(self.args.model.parameters(), lr=1e-2)
 
             new_test = self.gen_input(arg_num, special)
-            new_output, conv, sol_found = self.test_and_learn(new_test, leaf_ind)
+            output, sol_found = self.test(new_test, leaf_ind)
+            num_exe += len(output)
 
             if sol_found:
+                self.add_dist_pop(output)
                 continue
 
-            output[leaf_ind] = new_output
-            grad = []
-            use_approx = True if conv else False
+            output.extend(self.dist_pop)
+            output = sorted(output, key=lambda data: data[1][leaf_ind])[:self.p]
+            conv = self.learn(output, leaf_ind)
+
+            use_approx = True if (conv and self.use_approx) else False
+            grad = copy.deepcopy(output) if use_approx else []
 
             # Generations spent on approximation, fitness converges
             approx_gen = 0
@@ -322,13 +332,10 @@ class TestGenerator:
             for i in range(self.gen):
                 print('i', i)
 
-                print(use_approx, approx_gen)
-
-                #use_approx = True
                 new_test = []
                 last_test_num = 0
 
-                parent = grad if use_approx else output[leaf_ind]
+                parent = grad if use_approx else output
     
                 # Generate test case until p tests
                 while len(new_test) < self.p:
@@ -338,7 +345,7 @@ class TestGenerator:
                     for child in children:
                         child_found = False
 
-                        if in_test([out[0] for out in output[leaf_ind]], child):
+                        if in_test([out[0] for out in output], child):
                             continue
                         
                         add_test(new_test, child)
@@ -350,11 +357,11 @@ class TestGenerator:
 
                     new_output = self.approx(new_test, leaf_ind)
                 
-                    org_best = output[leaf_ind][0][1][leaf_ind]
-                    last_best = org_best if approx_gen == 1 else grad[0][1][leaf_ind]
+                    org_best = output[0][1][leaf_ind]
+                    last_best = grad[0][1][leaf_ind]
 
                     # Save first save_p tests
-                    save_sel(grad, new_output, leaf_ind, self.p, self.save_p)
+                    grad = save_sel(grad, new_output, leaf_ind, self.p, self.save_p)
                     grad.sort(key=lambda data: data[1][leaf_ind])
                     cur_best = grad[0][1][leaf_ind]
 
@@ -363,41 +370,34 @@ class TestGenerator:
                         deep_leaf = True
 
                     # Fitness converges
-                    #print(leaf_ind, cur_best, last_best)
-                    if cur_best >= last_best or abs(cur_best - last_best) < 1e-1:
+                    if cur_best >= last_best or abs(cur_best - last_best) < 1e-4:
                         conv_gen += 1
                         self.args.step_size /= 10
 
-                    else:
-                        conv_gen = 0
-                        self.args.step_size = self.step_size
-
                     # Found deeper case or fitness converges
                     # Or last generation
-                    if deep_leaf or fit_conv >= 5 or i == self.gen - 1:
+                    if deep_leaf or approx_gen >= 10 or conv_gen >= 6 or i == self.gen - 1:
                         use_approx = False
                         new_test = [out[0] for out in grad]
 
                 # Without dnn, do not use approximation
                 if not self.args.use_dnn or not use_approx:
                     new_output, conv, sol_found = self.test_and_learn(new_test, leaf_ind)
-                    
-                    if sol_found or i == self.gen - 1:
-                        break
-
-                    new_output.sort(key=lambda data:data[1][leaf_ind])
+                    num_exe += len(new_output)
 
                     # Fitness converges
                     fit_conv = False
 
                     # Select population
-                    save_sel(output[leaf_ind], new_output, leaf_ind, self.p, self.save_p)
-                    last_best = output[leaf_ind][0][1][leaf_ind]
-                    print(output[leaf_ind][0][0], last_best)
+                    output = save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+                    last_best = output[0][1][leaf_ind]
 
-                    output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
-                    cur_best = output[leaf_ind][0][1][leaf_ind]
-                    print(output[leaf_ind][0][0], cur_best)
+                    if sol_found or i == self.gen - 1:
+                        self.add_dist_pop(output)
+                        break
+
+                    output.sort(key=lambda data: data[1][leaf_ind])
+                    cur_best = output[0][1][leaf_ind]
 
                     # Fitness doesn't change much
                     if abs(last_best - cur_best) < 1e-4:
@@ -408,14 +408,16 @@ class TestGenerator:
                         approx_gen = 0
                         conv_gen = 0
                         self.args.step_size = self.step_size
-                        grad = copy.deepcopy(output[leaf_ind])
+                        grad = copy.deepcopy(output)
 
+        rt.append(num_exe)
+        
         # Set of braches coverd
         br_pass = set()
 
         for leaf_ind, lvl_dict in leaf_index_copy.items():
             # Solution found for leaf
-            if leaf_ind in self.leaf_cover:
+            if not leaf_ind in self.leaf_index:
                 for parent in lvl_dict:
                     br_pass.add(parent)
 
@@ -428,8 +430,7 @@ class TestGenerator:
                     if lvl >= best_lvl:
                         br_pass.add(parent)
 
-        rt.append(2 * (len(branch.br_list) - 1))
-        rt.append(len(br_pass))
+        rt.append(len(br_pass) / (2.0 * (len(branch.br_list) - 1)) * 100.0)
 
         # Delete trashes
         del module
@@ -442,7 +443,7 @@ class TestGenerator:
 
         return rt
 
-    def test_file(self, test_file_name, use_dnn):
+    def test_file(self, test_file_name, use_dnn, use_approx):
         root = astor.code_to_ast.parse_file(test_file_name)
 
         # Generate unused variable name to avoid shadowing
@@ -452,6 +453,7 @@ class TestGenerator:
         self.args.temp_name = 't' * var_len
         self.args.lambda_arg = 'x' * var_len
         self.new_func_name = 'f' * (var_len + 1)
+        self.use_approx = use_approx
 
         self.args.use_dnn = use_dnn
 

@@ -20,14 +20,14 @@ def guided_mutation(inputs, args):
 
 def train(inputs, fitness, loss_range, args):
     args.model.train()
-
+    
     inputs_var = torch.Tensor(inputs).to(args.device)
+    inputs_var.requires_grad_(False)
+
     target_var = torch.Tensor(fitness).to(args.device)
+    target_var.requires_grad_(False)
 
-    #scheduler = optim.lr_scheduler.StepLR(args.dnn[leaf_ind][1], step_size = 25, gamma = 0.95)
-    #scheduler = optim.lr_scheduler.CyclicLR(args.dnn[leaf_ind][1], base_lr = 1e-4, max_lr = 0.1)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(args.opt, factor = 0.95, patience = 25, mode='min')
-
+    
     for epoch in range(args.niter + 1):
         args.opt.zero_grad()
         pred = args.model(inputs_var)
@@ -38,9 +38,8 @@ def train(inputs, fitness, loss_range, args):
 
         loss.backward()
 
-        #torch.nn.utils.clip_grad_norm_(args.model.parameters(), 1)
+        #torch.nn.utils.clip_grad_norm_(args.model.parameters(), 10)
         args.opt.step()
-        #scheduler.step(loss)
 
 def forward(inputs, leaf_ind, args):
     args.model.eval()
