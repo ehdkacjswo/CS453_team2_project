@@ -5,8 +5,8 @@ import setuptools
 setuptools.setup(
     name="gen_src",
     version="2",
-    author="Woohyun Han",
-    author_email="whhan8485@kaist.ac.kr",
+    author="Woohyun Han, Seongha Eom",
+    author_email="whhan8485@kaist.ac.kr, doubleb@kaist.ac.kr",
     description="srcgen package",
     url="https://github.com/ehdkacjswo/CS453_team2_project/tree/struct-refactor/srcgen",
     packages=setuptools.find_packages(),
