@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-
 def guided_mutation(inputs, args):
     args.model.eval()
 
@@ -15,11 +14,11 @@ def guided_mutation(inputs, args):
     org_input = inputs_var.detach()
     grad = gradient.detach()
 
-    mutated_input = org_input - grad * 1e6
+    mutated_input = org_input + grad * args.step_size
     return mutated_input.round()
 
 
-def train(inputs, fitness, args):
+def train(inputs, fitness, loss_range, args):
     args.model.train()
 
     inputs_var = torch.Tensor(inputs).to(args.device)
@@ -32,20 +31,16 @@ def train(inputs, fitness, args):
     for epoch in range(args.niter + 1):
         args.opt.zero_grad()
         pred = args.model(inputs_var)
-        #loss = nn.MSELoss()(pred, target_var.unsqueeze(1))
         loss = nn.L1Loss()(pred, target_var)
-        #print(loss)
 
-        if loss.item() < 0.2 or epoch == args.niter:
+        if loss.item() < loss_range or epoch == args.niter:
             return epoch, loss.item()
+
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(args.model.parameters(), 1)
+        #torch.nn.utils.clip_grad_norm_(args.model.parameters(), 1)
         args.opt.step()
-        scheduler.step(loss)
-
         #scheduler.step(loss)
-
 
 def forward(inputs, leaf_ind, args):
     args.model.eval()

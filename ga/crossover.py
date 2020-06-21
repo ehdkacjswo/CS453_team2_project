@@ -30,7 +30,7 @@ def doam_cross(output, leaf_ind, special, args):
     children = []
 
     # Single point crossover
-    if rand.random() < 0.7 and len(pair[0][0]) > 1:
+    if rand.random() < 0.9 and len(pair[0][0]) > 1:
         cross_point = rand.randint(1, len(pair[0][0]) - 1)
 
         children.append(pair[0][0][:cross_point] + pair[1][0][cross_point:])
