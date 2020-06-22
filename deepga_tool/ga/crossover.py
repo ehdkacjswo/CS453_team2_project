@@ -2,8 +2,8 @@ import random as rand
 import math
 import torch
 import copy
-from ga.mutation import doam_mut
-from dnn.nn_train import guided_mutation, forward
+from deepga_tool.ga.mutation import doam_mut
+from deepga_tool.dnn.nn_train import guided_mutation, forward
 
 
 def doam_cross(output, leaf_ind, special, args):

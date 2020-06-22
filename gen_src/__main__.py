@@ -4,7 +4,7 @@ import astor
 from gen_src.function import make_node_function_def
 
 '''
-python srcgen.py > make_node_source_file.py
+python -m gen_src > make_node_source_file.py
 Reference : https://github.com/radomirbosak/random-ast.git
 '''
 

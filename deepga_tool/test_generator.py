@@ -7,15 +7,15 @@ import math
 import time
 import importlib
 import random as rand
-from ast_helper import find_num, find_if, name_len, branch
+from deepga_tool.ast_helper import find_num, find_if, name_len, branch
 
-from ga.ga_helper import in_test, add_test
-from ga.selection import save_sel
-from ga.crossover import doam_cross
-from ga.mutation import doam_mut
+from deepga_tool.ga.ga_helper import in_test, add_test
+from deepga_tool.ga.selection import save_sel
+from deepga_tool.ga.crossover import doam_cross
+from deepga_tool.ga.mutation import doam_mut
 
-from dnn.model import MLP
-from dnn.nn_train import guided_mutation, train, forward
+from deepga_tool.dnn.model import MLP
+from deepga_tool.dnn.nn_train import guided_mutation, train, forward
 import torch
 import torch.optim as optim
 

@@ -1,5 +1,5 @@
 import argparse
-from test_generator import TestGenerator
+from deepga_tool.test_generator import TestGenerator
 
 
 def main():
