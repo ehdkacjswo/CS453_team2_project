@@ -303,7 +303,7 @@ class TestGenerator:
 
             if self.args.use_dnn:
                 self.args.model = MLP(arg_num).to(self.args.device)
-                self.args.opt = optim.AdamW(self.args.model.parameters(), lr=1e-3)
+                self.args.opt = optim.Adam(self.args.model.parameters(), lr=1e-3)
 
             new_test = self.gen_input(arg_num, special)
             output, sol_found = self.test(new_test, leaf_ind)
@@ -365,7 +365,7 @@ class TestGenerator:
 
                     # Found deeper case or fitness converges
                     # Or last generation
-                    if deep_leaf or approx_gen >= 5 or conv_gen >= 3 or i == self.gen - 1:
+                    if deep_leaf or approx_gen >= 10 or conv_gen >= 5 or i == self.gen - 1:
                         use_approx = False
                         conv_gen = 0
                         new_test = [out[0] for out in grad]
