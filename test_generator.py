@@ -365,7 +365,7 @@ class TestGenerator:
 
                     # Found deeper case or fitness converges
                     # Or last generation
-                    if deep_leaf or approx_gen >= 10 or conv_gen >= 5 or i == self.gen - 1:
+                    if deep_leaf or approx_gen >= 10 or conv_gen >= 4 or i == self.gen - 1:
                         use_approx = False
                         conv_gen = 0
                         new_test = [out[0] for out in grad]
@@ -391,7 +391,7 @@ class TestGenerator:
                     # Fitness doesn't change much
                     if abs(last_best - cur_best) < 1e-4:
                         conv_gen += 1
-                        if conv_gen >= 3:
+                        if conv_gen >= 4:
                             self.args.step_size = self.step_size
                         else:
                             self.args.step_size /= 10
