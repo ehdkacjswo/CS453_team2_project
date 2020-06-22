@@ -178,7 +178,7 @@ class TestGenerator:
             dnn_inp.append(out[0])
             dnn_fit.append([out[1][leaf_ind] / leaf_depth])
 
-        loss_range = 0.1 / leaf_depth
+        loss_range = 0.2 / leaf_depth
         epoch, loss = train(dnn_inp, dnn_fit, loss_range, self.args)
 
         if loss < loss_range:
@@ -200,9 +200,10 @@ class TestGenerator:
     # Approximate fitness using model
     def approx(self, new_test, leaf_ind):
         new_output = []
+        leaf_depth = len(self.leaf_index[leaf_ind])
 
         for test in new_test:
-            new_output.append((test, {leaf_ind : forward(test, leaf_ind, self.args) * len(self.leaf_index[leaf_ind])}))
+            new_output.append((test, {leaf_ind : forward(test, leaf_ind, self.args) * leaf_depth}))
 
         return new_output
 
@@ -330,7 +331,6 @@ class TestGenerator:
             
             for i in range(self.gen):
                 new_test = []
-                last_test_num = 0
 
                 parent = grad + output if use_approx else output
     
@@ -349,27 +349,20 @@ class TestGenerator:
                     deep_leaf = False
 
                     new_output = self.approx(new_test, leaf_ind)
-                
-                    org_best = output[0][1][leaf_ind]
-                    last_best = grad[0][1][leaf_ind] if approx_gen > 1 else org_best
+                    last_best = grad[0][1][leaf_ind] if approx_gen > 1 else output[0][1][leaf_ind]
 
                     # Save first save_p tests
                     grad = save_sel(grad, new_output, leaf_ind, self.p, self.save_p)
                     grad.sort(key=lambda data: data[1][leaf_ind])
                     cur_best = grad[0][1][leaf_ind]
 
-                    # Found deeper case
-                    if cur_best <= math.floor(org_best):
-                        deep_leaf = True
-
                     # Fitness converges
                     if cur_best >= last_best or abs(cur_best - last_best) < 1e-4:
                         conv_gen += 1
                         self.args.step_size /= 10
 
-                    # Found deeper case or fitness converges
-                    # Or last generation
-                    if deep_leaf or approx_gen >= 10 or conv_gen >= 4 or i == self.gen - 1:
+                    # Fitness converges or last generation
+                    if approx_gen >= 5 or conv_gen >= 4 or i == self.gen - 1:
                         use_approx = False
                         conv_gen = 0
                         new_test = [out[0] for out in grad]
@@ -377,7 +370,7 @@ class TestGenerator:
 
                 # Without dnn, do not use approximation
                 if not self.args.use_dnn or not use_approx:
-                    new_output, conv, sol_found = self.test_and_learn(new_test, leaf_ind)
+                    new_output, sol_found = self.test(new_test, leaf_ind)
                     num_exe += len(new_output)
 
                     # Select population
@@ -391,6 +384,8 @@ class TestGenerator:
                         best_lvl[leaf_ind] = math.ceil(cur_best)
                         self.add_dist_pop(output)
                         break
+
+                    conv = self.learn(new_output, leaf_ind)
 
                     # Fitness doesn't change much
                     if abs(last_best - cur_best) < 1e-1:

@@ -34,7 +34,8 @@ def train(inputs, fitness, loss_range, args):
         pred = args.model(inputs_var)
         loss = nn.L1Loss()(pred, target_var)
 
-        if loss.item() < loss_range or epoch == args.niter:
+        if epoch == args.niter:
+        #if loss.item() < loss_range or epoch == args.niter:
             return epoch, loss.item()
 
         loss.backward()
