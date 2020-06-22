@@ -310,7 +310,6 @@ class TestGenerator:
             num_exe += len(output)
 
             if sol_found:
-                self.add_dist_pop(output)
                 continue
 
             output.extend(self.dist_pop)
@@ -389,7 +388,7 @@ class TestGenerator:
                         break
 
                     # Fitness doesn't change much
-                    if abs(last_best - cur_best) < 1e-4:
+                    if abs(last_best - cur_best) < 1e-1:
                         conv_gen += 1
                         if conv_gen >= 4:
                             self.args.step_size = self.step_size
