@@ -5,57 +5,44 @@ import numpy as np
 import time
 
 
-def guided_mutation(inputs, leaf_ind, args):
+def guided_mutation(inputs, args):
+    args.model.eval()
+
     inputs_var = torch.Tensor(inputs).to(args.device)
     inputs_var.requires_grad_(True)
-    fitness = args.dnn[leaf_ind][0](inputs_var)
+    fitness = args.model(inputs_var)
     gradient = torch.autograd.grad(fitness, inputs_var)[0]
 
     org_input = inputs_var.detach()
     grad = gradient.detach()
 
-    '''if torch.norm(grad) == 0:
-		return org_input[:, :args.input_dim].round()
-		
-	mutated_input = org_input - grad / torch.norm(grad) * 0.1 * torch.norm(org_input)'''
-    mutated_input = org_input - grad * 1e6
-    aaa = grad * 1e6
-    print(aaa.round())
-    return mutated_input[:, :args.input_dim].round()
+    mutated_input = org_input + grad * args.step_size
+    return mutated_input.round()
 
 
-def train_one_iter(inputs, fitness, leaf_ind, args):
-    #torch.cuda.synchronize()
-    a = time.perf_counter()
+def train(inputs, fitness, loss_range, args):
+    args.model.train()
+    
     inputs_var = torch.Tensor(inputs).to(args.device)
+    inputs_var.requires_grad_(False)
+
     target_var = torch.Tensor(fitness).to(args.device)
-    #torch.cuda.synchronize()
-    b = time.perf_counter()
-    #print(b-a)
+    target_var.requires_grad_(False)
 
-    #torch.cuda.synchronize()
-    a = time.perf_counter()
+    for epoch in range(args.niter + 1):
+        args.opt.zero_grad()
+        pred = args.model(inputs_var)
+        loss = nn.L1Loss()(pred, target_var)
 
-    args.dnn[leaf_ind][0].train()
-    pred = args.dnn[leaf_ind][0](inputs_var)
-    #loss = nn.MSELoss()(pred, target_var.unsqueeze(1))
-    loss = nn.MSELoss()(pred, target_var)
+        if loss.item() < loss_range or epoch == args.niter:
+            return epoch, loss.item()
 
-    loss.backward()
-    args.dnn[leaf_ind][1].step()
-    args.dnn[leaf_ind][1].zero_grad()
-    # print(loss.item())
-
-    #torch.cuda.synchronize()
-    b = time.perf_counter()
-    #print(b-a)
-
-    '''print("[{}/{}]: loss={}".format(iter_num, args.niter, loss.item()))'''
-    return loss.item()
-
+        loss.backward()
+        args.opt.step()
 
 def forward(inputs, leaf_ind, args):
+    args.model.eval()
     inputs_var = torch.Tensor(inputs).to(args.device)
-    pred = args.dnn[leaf_ind][0](inputs_var)
+    pred = args.model(inputs_var)
 
-    return pred.detach().item()
+    return pred.item()

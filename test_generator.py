@@ -4,9 +4,8 @@ import sys
 import os
 import copy
 import math
-import imp
-import importlib
 import time
+import importlib
 import random as rand
 from ast_helper import find_num, find_if, name_len, branch
 
@@ -16,7 +15,7 @@ from ga.crossover import doam_cross
 from ga.mutation import doam_mut
 
 from dnn.model import MLP
-from dnn.nn_train import guided_mutation, train_one_iter, forward
+from dnn.nn_train import guided_mutation, train, forward
 import torch
 import torch.optim as optim
 
@@ -36,12 +35,13 @@ class TestGenerator:
         device = torch.device("cuda" if use_cuda else "cpu")
 
         self.niter = niter
+        self.step_size = step_size
         self.lr = lr
         self.no_cuda = no_cuda
         self.seed = seed
         self.model_dir = model_dir
 
-        self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size)
+        self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size, niter)
 
         rand.seed(seed)
         torch.manual_seed(seed)
@@ -51,20 +51,19 @@ class TestGenerator:
 
     # Class contains arguments for other functions
     class Args:
-        def __init__(self, pm, alpha, beta, device, step_size):
+        def __init__(self, pm, alpha, beta, device, step_size, niter):
             self.pm = pm
             self.alpha = alpha
             self.beta = beta
             self.device = device
             self.step_size = step_size
+            self.niter = niter
             self.use_dnn = True
             self.k = 1
 
     # Generarte input from function ast
-    def gen_input(self, func):
+    def gen_input(self, arg_num, special):
         rt = []
-        arg_num = len(func.args.args)
-        special = list(set(find_num(func.body) + [0, 1, -1]))
 
         while len(rt) < self.p:
             inp = []
@@ -73,11 +72,11 @@ class TestGenerator:
                 if rand.random() <= 0.2:
                     inp.append(rand.choice(special))
                 else:
-                    inp.append(rand.randint(-10000, 10000))
+                    inp.append(rand.randint(-1000, 1000))
 
             add_test(rt, inp)
 
-        return special, rt
+        return rt
 
     # Analyze the fitness output
     def get_result(self):
@@ -131,20 +130,9 @@ class TestGenerator:
 
         return br_fit
 
-    # Learn new test and train dnn
-    def test_and_learn(self, new_test):
+    # Testsult, dnn converges, solution found)
+    def test(self, new_test, leaf_ind):
         new_output = []
-        del_ind = []
-        sol_found = False
-
-        # input and fitness for dnn
-        if self.args.use_dnn:
-            dnn_inp = {}
-            dnn_fit = {}
-
-            for leaf_ind in self.leaf_index:
-                dnn_inp[leaf_ind] = []
-                dnn_fit[leaf_ind] = []
 
         for inp in new_test:
             # Don't print anything
@@ -156,40 +144,72 @@ class TestGenerator:
                         # Exception detected, do nothing
                         pass
 
-            new_output.append([inp, self.get_result()])
+            new_output.append((inp, self.get_result()))
 
             # Check whether the solution is found
-            for leaf_ind in list(self.leaf_index):
+            for sub_leaf_ind in list(self.leaf_index):
                 # When the test is found for leaf
-                if new_output[-1][1][leaf_ind] < 0:
-                    del self.leaf_index[leaf_ind]
-                    self.leaf_cover.append(leaf_ind)
-                    del_ind.append(leaf_ind)
+                if new_output[-1][1][sub_leaf_ind] < 0:
+                    del self.leaf_index[sub_leaf_ind]
+                    self.add_dist_pop([new_output[-1]])
 
-                    print(leaf_ind, inp)
+                    if sub_leaf_ind == leaf_ind:
+                        return new_output, True
 
-                    if not bool(self.leaf_index):
-                        sol_found = True
                     break
 
-            if sol_found:
-                break
+        return new_output, False
 
-            if self.args.use_dnn:
-                for leaf_ind in self.leaf_index:
-                    dnn_inp[leaf_ind].append(new_output[-1][0])
-                    dnn_fit[leaf_ind].append([new_output[-1][1][leaf_ind]])
+    # Train model with given results
+    def learn(self, new_output, leaf_ind):
+        if not self.args.use_dnn:
+            return False
 
-        if self.args.use_dnn and (not sol_found):
-            for leaf_ind in self.leaf_index:
-                for j in range(200):
-                    aaa = train_one_iter(
-                        dnn_inp[leaf_ind], dnn_fit[leaf_ind], leaf_ind, self.args)
-                    if aaa < 0.1:
-                        #print(leaf_ind, j, aaa)
-                        break
+        dnn_inp = []
+        dnn_fit = []
+        leaf_depth = len(self.leaf_index[leaf_ind])
 
-        return new_output, del_ind, sol_found
+        for out in new_output:
+            dnn_inp.append(out[0])
+            dnn_fit.append([out[1][leaf_ind] / leaf_depth])
+
+        loss_range = 0.1 / leaf_depth
+        epoch, loss = train(dnn_inp, dnn_fit, loss_range, self.args)
+
+        if loss < loss_range:
+            return True
+
+        else:
+            return False
+
+    # Test and learn the given inputs
+    def test_and_learn(self, new_test, leaf_ind):
+        new_output, sol_found = self.test(new_test, leaf_ind)
+        
+        if not sol_found:
+            return new_output, self.learn(new_output, leaf_ind), sol_found
+
+        else:
+            return new_output, False, sol_found
+
+    # Approximate fitness using model
+    def approx(self, new_test, leaf_ind):
+        new_output = []
+
+        for test in new_test:
+            new_output.append((test, {leaf_ind : forward(test, leaf_ind, self.args) * len(self.leaf_index[leaf_ind])}))
+
+        return new_output
+
+    # Add new_output to distributed population
+    def add_dist_pop(self, new_output):
+        org_len = len(self.dist_pop)
+
+        for out in new_output:
+            if not in_test([pop[0] for pop in self.dist_pop[:org_len]], out[0]):
+                self.dist_pop.append(out)
+
+        return
 
     # Helps to suppress print
     class HiddenPrint:
@@ -223,7 +243,9 @@ class TestGenerator:
             return
 
         # Generate input
-        special, new_test = self.gen_input(func)
+        special = list(set(find_num(func.body) + [-1, 0, 1]))
+        arg_num = len(func.args.args)
+        new_test = self.gen_input(arg_num, special)
 
         # Change function name and Import original function
         func.name = self.new_func_name
@@ -266,239 +288,140 @@ class TestGenerator:
         # Used for final printing
         leaf_index_copy = copy.deepcopy(self.leaf_index)
 
-        # DNN init
-        if self.args.use_dnn:
-            self.args.input_dim = len(func.args.args) - 1
-            self.args.dnn = {}
-
-        # Branch fitness output with(test, output)
-        output = {}
-        grad = {}
-
-        for leaf_ind in self.leaf_index:
-            output[leaf_ind] = []
-            grad[leaf_ind] = []
-
-            if self.args.use_dnn:
-                model = MLP(self.args.input_dim).to(self.args.device)
-                opt = optim.SGD(model.parameters(), lr=self.lr)
-                self.args.dnn[leaf_ind] = (model, opt)
-
         # Import revised code
         module = importlib.import_module(func_file_name[:-3].replace('/', '.'))
         self.method = getattr(module, self.new_func_name)
 
-        # Index of coverd leaves
-        self.leaf_cover = []
-        sol_found = False
+        # Number of executions of program
+        num_exe = 0
+        self.dist_pop = []
+        best_lvl = {}
 
-        # Return value (gen, # of br, # of br passed)
-        rt = []
+        for leaf_ind in list(self.leaf_index):
+            if leaf_ind not in self.leaf_index:
+                continue
 
-        print(self.leaf_index.keys())
+            if self.args.use_dnn:
+                self.args.model = MLP(arg_num).to(self.args.device)
+                self.args.opt = optim.AdamW(self.args.model.parameters(), lr=1e-3)
 
-        # Population initialization
-        new_output, del_ind, sol_found = self.test_and_learn(new_test)
+            new_test = self.gen_input(arg_num, special)
+            output, sol_found = self.test(new_test, leaf_ind)
+            num_exe += len(output)
 
-        # Leaves with normal, grad_desc evaluation (best, gen)
-        normal = {}
-        approx = {}
+            if sol_found:
+                self.add_dist_pop(output)
+                continue
 
-        for leaf_ind in self.leaf_index:
-            save_sel(output, new_output, leaf_ind, self.p, self.save_p)
-            output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
+            output.extend(self.dist_pop)
+            output = sorted(output, key=lambda data: data[1][leaf_ind])[:self.p]
+            conv = self.learn(output, leaf_ind)
 
-            # Update best fitness (best, gen)
-            normal[leaf_ind] = [output[leaf_ind][0][1][leaf_ind], 0]
+            use_approx = True if (conv and self.use_approx) else False
+            grad = []
 
-        for i in range(self.gen):
-            print(i)
-            # Leaf indexes from approximation mode to normal mode
-            approx_to_normal = set()
-
-            # Offspring generation (approx case)
-            for leaf_ind in list(approx):
-                new_test = []
-
-                for test in [out[0] for out in output[leaf_ind]]:
-                    child = guided_mutation([test], leaf_ind, self.args).tolist()[0]
-                    child = [int(inp) for inp in child]
-
-                    if rand.random() < self.args.pm or child == test:
-                        child = doam_mut(child, special, self.args.pm, self.args.alpha, self.args.beta)
-
-                    add_test(new_test, child)
-
-                for j in range(10):
-                    # Deeper case found or 
-                    found_deeper = False
-                    get_better = False
-
-                    # Generate gradient descent mutant
-                    for test in [out[0] for out in grad[leaf_ind]]:
-                        child = guided_mutation(
-                            [test], leaf_ind, self.args).tolist()[0]
-                        child = [int(inp) for inp in child]
-
-                        # Mutate
-                        if rand.random() < self.args.pm or child == test:
-                            child = doam_mut(child, special, self.args.pm, self.args.alpha, self.args.beta)
-
-                        if not in_test([out[0] for out in grad[leaf_ind]], child):
-                            add_test(new_test, child)
-
-                    new_output = []
-
-                    for test in new_test:
-                        new_output.append(
-                            [test, {leaf_ind: forward([test], leaf_ind, self.args)}])
-
-                        # Found deeper case
-                        if new_output[-1][1][leaf_ind] < approx[leaf_ind][0] or new_output[-1][1][leaf_ind] <= 0:
-                            found_deeper = True
-
-                        # Found better case
-                        if grad[leaf_ind] and new_output[-1][1][leaf_ind] <= grad[leaf_ind][0][1][leaf_ind] - 1e-4:
-                            get_better = True
-                
-                    save_sel(grad, new_output, leaf_ind, self.p, self.save_p)
-                    grad[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
-                    
-                    # Deeper case found or haven't found for some gen
-                    if found_deeper or (not get_better):
-                        approx_to_normal.add(leaf_ind)
-                        del approx[leaf_ind]
-                        break
-
-                    else:
-                        new_test = []
-
-            # Have to generate offspring
-            if bool(approx_to_normal) or bool(normal):
-                pop_per_leaf = int(
-                    math.ceil(float(self.p) / (len(approx_to_normal) + len(normal))))
+            # Generations spent on approximation, fitness converges
+            approx_gen = 0
+            conv_gen = 0
+            
+            for i in range(self.gen):
                 new_test = []
                 last_test_num = 0
 
-                # Offspring generation (normal case)
-                for leaf_ind in normal:
-                    # Generate test case until p tests
-                    while len(new_test) - last_test_num < pop_per_leaf:
-                        children = doam_cross(
-                            output[leaf_ind], leaf_ind, special, self.args)
+                parent = grad + output if use_approx else output
+    
+                # Generate test case until p tests
+                while len(new_test) < self.p:
+                    children = doam_cross(parent, leaf_ind, special, self.args)
 
-                        # Check whether the child is already in test case
-                        for child in children:
-                            child_found = False
-
-                            for sub_leaf_ind in self.leaf_index:
-                                if in_test([out[0] for out in output[sub_leaf_ind]], child):
-                                    child_found = True
-                                    break
-
-                            if not child_found:
-                                add_test(new_test, child)
-
-                    last_test_num = len(new_test)
-
-                # Offspring generation (approx case)
-                for leaf_ind in approx_to_normal:
-                    # First save_p elements are already evalueated
-                    for child in [out[0] for out in grad[leaf_ind]]:
-                        child_found = False
-
-                        # Check whether the child is already in test case
-                        for sub_leaf_ind in self.leaf_index:
-                            if in_test([out[0] for out in output[sub_leaf_ind]], child):
-                                child_found = True
-                                break
-
-                        if not child_found:
+                    # Check whether the child is already in test case
+                    for child in children:
+                        if not in_test([out[0] for out in parent], child):
                             add_test(new_test, child)
 
-                        if len(new_test) - last_test_num >= pop_per_leaf:
-                            break
+                # Approximation used only when using dnn
+                if self.args.use_dnn and use_approx:
+                    approx_gen += 1
+                    deep_leaf = False
 
-                    grad[leaf_ind] = []
-                    last_test_num = len(new_test)
+                    new_output = self.approx(new_test, leaf_ind)
                 
-                if new_test:
-                    new_output, del_ind, sol_found = self.test_and_learn(new_test)
+                    org_best = output[0][1][leaf_ind]
+                    last_best = grad[0][1][leaf_ind] if approx_gen > 1 else org_best
 
-                    # Every solution found
-                    if sol_found:
-                        rt.append(i + 1)
-                        break
+                    # Save first save_p tests
+                    grad = save_sel(grad, new_output, leaf_ind, self.p, self.save_p)
+                    grad.sort(key=lambda data: data[1][leaf_ind])
+                    cur_best = grad[0][1][leaf_ind]
 
-                    # Delete covered leaves
-                    for ind in del_ind:
-                        normal.pop(ind, None)
-                        approx.pop(ind, None)
-                        approx_to_normal.discard(ind)
+                    # Found deeper case
+                    if cur_best <= math.floor(org_best):
+                        deep_leaf = True
+
+                    # Fitness converges
+                    if cur_best >= last_best or abs(cur_best - last_best) < 1e-4:
+                        conv_gen += 1
+                        self.args.step_size /= 10
+
+                    # Found deeper case or fitness converges
+                    # Or last generation
+                    if deep_leaf or approx_gen >= 5 or conv_gen >= 3 or i == self.gen - 1:
+                        use_approx = False
+                        conv_gen = 0
+                        new_test = [out[0] for out in grad]
+                        self.args.step_size = self.step_size
+
+                # Without dnn, do not use approximation
+                if not self.args.use_dnn or not use_approx:
+                    new_output, conv, sol_found = self.test_and_learn(new_test, leaf_ind)
+                    num_exe += len(new_output)
 
                     # Select population
-                    for leaf_ind in list(normal) + list(approx_to_normal) + list(approx):
-                        save_sel(output, new_output, leaf_ind, self.p, self.save_p)
-                        output[leaf_ind].sort(key=lambda data: data[1][leaf_ind])
+                    output = save_sel(output, new_output, leaf_ind, self.p, self.save_p)
+                    last_best = output[0][1][leaf_ind]
 
-                    # Check if deeper case is found
-                    for leaf_ind in list(approx):
-                        move_to_normal = False
+                    output.sort(key=lambda data: data[1][leaf_ind])
+                    cur_best = output[0][1][leaf_ind]
 
-                        # Found deeper case
-                        if output[leaf_ind][0][1][leaf_ind] < approx[leaf_ind][0]:
-                            move_to_normal = True
+                    if sol_found or i == self.gen - 1:
+                        best_lvl[leaf_ind] = math.ceil(cur_best)
+                        self.add_dist_pop(output)
+                        break
+
+                    # Fitness doesn't change much
+                    if abs(last_best - cur_best) < 1e-4:
+                        conv_gen += 1
+                        if conv_gen >= 3:
+                            self.args.step_size = self.step_size
                         else:
-                            approx[leaf_ind][1] += 1
+                            self.args.step_size /= 10
 
-                        if move_to_normal or approx[leaf_ind][1] >= 5:
-                            approx_to_normal.add(leaf_ind)
-                            del approx[leaf_ind]
-                                     
-                for leaf_ind in list(normal):
-                    # Check change of best fitness
-                    last_best = normal[leaf_ind][0]
-                    normal[leaf_ind][0] = output[leaf_ind][0][1][leaf_ind]
+                    if (conv or conv_gen > 0) and self.use_approx:
+                        use_approx = True
+                        approx_gen = 0
+                        conv_gen = 0
+                        grad = []
+                        self.args.step_size = self.step_size
 
-                    if self.args.use_dnn and abs(last_best - normal[leaf_ind][0]) < 1e-4:
-                        normal[leaf_ind][1] += 1
-
-                        # Move to approximation
-                        if normal[leaf_ind][1] >= 1:
-                            approx[leaf_ind] = [math.floor(normal[leaf_ind][0]), 0]
-                            grad[leaf_ind] = []
-                            del normal[leaf_ind]
-
-                    else:
-                        normal[leaf_ind][1] = 0
-
-                for leaf_ind in approx_to_normal:
-                    normal[leaf_ind] = [output[leaf_ind][0][1][leaf_ind], 0]
-
-            if not bool(self.leaf_index) or i == self.gen - 1:
-                rt.append(i + 1)
-                break
-
+        rt = []
+        rt.append(num_exe)
+        
         # Set of braches coverd
         br_pass = set()
 
         for leaf_ind, lvl_dict in leaf_index_copy.items():
             # Solution found for leaf
-            if leaf_ind in self.leaf_cover:
+            if not leaf_ind in self.leaf_index:
                 for parent in lvl_dict:
                     br_pass.add(parent)
 
             else:
-                test = output[leaf_ind][0][0]
-                best_lvl = int(math.ceil(output[leaf_ind][0][1][leaf_ind]))
-
                 for parent, lvl in lvl_dict.items():
                     # Add when only it's visited
-                    if lvl >= best_lvl:
+                    if lvl >= best_lvl[leaf_ind]:
                         br_pass.add(parent)
 
-        rt.append(2 * (len(branch.br_list) - 1))
-        rt.append(len(br_pass))
+        rt.append(len(br_pass) / (2.0 * (len(branch.br_list) - 1)) * 100.0)
 
         # Delete trashes
         del module
@@ -511,7 +434,7 @@ class TestGenerator:
 
         return rt
 
-    def test_file(self, test_file_name, use_dnn):
+    def test_file(self, test_file_name, use_dnn, use_approx):
         root = astor.code_to_ast.parse_file(test_file_name)
 
         # Generate unused variable name to avoid shadowing
@@ -521,6 +444,7 @@ class TestGenerator:
         self.args.temp_name = 't' * var_len
         self.args.lambda_arg = 'x' * var_len
         self.new_func_name = 'f' * (var_len + 1)
+        self.use_approx = use_approx
 
         self.args.use_dnn = use_dnn
 
