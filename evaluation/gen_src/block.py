@@ -2,8 +2,8 @@ import ast
 import random
 import copy
 
-from gen_src.expression import make_node_expression, make_node_test_expression
-from gen_src.statement import make_node_assign, make_node_loop_end, make_node_pass
+from evaluation.gen_src.expression import make_node_expression, make_node_test_expression
+from evaluation.gen_src.statement import make_node_assign, make_node_loop_end, make_node_pass
 
 MAX_NUM_STATEMENTS = 4
 

@@ -2,8 +2,8 @@ import ast
 import astor
 import random
 
-from gen_src.variable import make_node_rhs_variable, make_node_lhs_variable
-from gen_src.literal import make_node_literal
+from evaluation.gen_src.variable import make_node_rhs_variable, make_node_lhs_variable
+from evaluation.gen_src.literal import make_node_literal
 
 binary_ops = [
     ast.Add,

@@ -1,8 +1,8 @@
 import ast
 import random
 
-from gen_src.expression import make_node_expression
-from gen_src.variable import make_node_lhs_variable
+from evaluation.gen_src.expression import make_node_expression
+from evaluation.gen_src.variable import make_node_lhs_variable
 
 def make_node_assign(vctx, max_depth=None):
     value = make_node_expression(vctx, max_depth=max_depth)

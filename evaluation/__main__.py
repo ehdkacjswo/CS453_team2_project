@@ -1,36 +1,37 @@
 import os
 import argparse
 import glob
-from gen_src.srcgen import src_gen
+from evaluation.gen_src.gen import generate
+import deepga_tool
 
 PYTHON_CMD = 'python'
-RUN_PER_FILE = 1
+RUN_PER_FILE = 1  # Mutable by args
+
+MANUAL_SRC_DIR = 'evaluation/manual_src'
+GENNED_FNAME = '__genned_123456789.py'
 
 def run_test_generator(py_file_path):
-    main_path = os.path.join(os.getcwd(), 'main.py')
-    cmd = '{} {} {}'.format(PYTHON_CMD, main_path, py_file_path)
+    cmd = '{} -m deepga_tool {}'.format(PYTHON_CMD, py_file_path)
     for _ in range(RUN_PER_FILE):
         os.system(cmd)
 
 def eval_with_gen_src():
-    gen_src_dir = 'gen_src'
-    genned_path = os.path.join(gen_src_dir, 'genned.py')
-    genned_src = src_gen()
+    genned_src = generate()
     print("=" * 20)
     print(genned_src)
     print("=" * 20)
-    with open(genned_path, 'w') as genned_file:
+    with open(GENNED_FNAME, 'w') as genned_file:
         genned_file.write(genned_src)
-    run_test_generator(genned_path)
-    os.remove(genned_path)
+    run_test_generator(GENNED_FNAME)
+    os.remove(GENNED_FNAME)
 
 def eval_with_manual_src_all():
-    manual_src_py_files = os.path.join('manual_src', '*.py')
-    for manual_path in [os.path.join('manual_src', os.path.basename(whole_path)) for whole_path in glob.glob(manual_src_py_files)]:
+    manual_src_py_files = os.path.join(MANUAL_SRC_DIR, '*.py')
+    for manual_path in [os.path.join(MANUAL_SRC_DIR, os.path.basename(whole_path)) for whole_path in glob.glob(manual_src_py_files)]:
         run_test_generator(manual_path)
 
 def eval_with_manual_src_file(file_name):
-    manual_path = os.path.join('manual_src', file_name)
+    manual_path = os.path.join(MANUAL_SRC_DIR, file_name)
     run_test_generator(manual_path)
 
 def main():
@@ -44,10 +45,12 @@ def main():
 
     if args.file_name is not None:
         eval_with_manual_src_file(args.file_name)
-    else:
-        eval_with_manual_src_all()
+    elif args.gen_src_count > 0:
         for _ in range(args.gen_src_count):
             eval_with_gen_src()
+    else:
+        eval_with_manual_src_all()
+        
 
 if __name__ == "__main__":
     main()
