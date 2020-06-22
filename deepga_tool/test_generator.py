@@ -466,5 +466,5 @@ class TestGenerator:
         return [{
             'generation': elem[0],
             'coverage': elem[1],
-            'time': elem[2]
+            'elapsed_time': elem[2]
         } for elem in rt]

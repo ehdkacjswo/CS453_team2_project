@@ -15,8 +15,8 @@ binary_ops = [
 ]
 bool_ops = [ast.Or, ast.And]
 comparisons = [
-    ast.Eq,
-    ast.NotEq,
+    # ast.Eq,
+    # ast.NotEq,
     ast.Lt,
     ast.LtE,
     ast.Gt,
