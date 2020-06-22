@@ -55,3 +55,6 @@ doam.lee: fitness approximation with dnn
 TODO: Finish approximation part (add new_output to original output, adjust ending condition)
 		May apply dynamic step size for guided_mutation
 
+Changed SGD to AdamW and replace tanh with ReLU
+-> Prevent zero gradient, but slower
+

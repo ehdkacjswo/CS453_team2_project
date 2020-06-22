@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import time
+
 
 def guided_mutation(inputs, args):
     args.model.eval()

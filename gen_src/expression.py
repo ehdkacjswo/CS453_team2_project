@@ -2,8 +2,8 @@ import ast
 import astor
 import random
 
-from variable import make_node_rhs_variable
-from literal import make_node_literal
+from gen_src.variable import make_node_rhs_variable, make_node_lhs_variable
+from gen_src.literal import make_node_literal
 
 binary_ops = [
     ast.Add,
@@ -26,7 +26,7 @@ comparisons = [
 ]
 
 
-def make_node_expression(vctx, max_depth=None, numeric=False):
+def make_node_expression(vctx, max_depth=None, numeric=False, isbool=False):
     choices = [
         make_node_literal,
     ]
@@ -44,14 +44,19 @@ def make_node_expression(vctx, max_depth=None, numeric=False):
                 make_node_bool_op,
                 make_node_comparison,
             ]
-
+    if isbool:
+        choices += [
+            make_node_comparison,
+            make_node_comparison,
+        ]
     return random.choice(choices)(vctx, max_depth=max_depth)
+
 
 def make_node_test_expression(vctx, max_depth=None):
     choices = [
         make_node_bool_op,
         make_node_comparison,
-        make_node_comparison,
+        make_node_comparison
     ]
     ret = random.choice(choices)(vctx, max_depth=max_depth)
     return ret
@@ -67,7 +72,7 @@ def make_node_bool_op(vctx, max_depth=None):
     op = random.choice(bool_ops)
     length = max(2, random.randrange(0, 4))
 
-    values = [make_node_expression(vctx, max_depth=max_depth - 1) for _ in range(length)]
+    values = [make_node_expression(vctx, max_depth=max_depth - 1, isbool=True) for _ in range(length)]
     ret = ast.BoolOp(op(), values)
     return ret
 
@@ -77,5 +82,7 @@ def make_node_comparison(vctx, max_depth=None):
 
     ops = [op() for op in random.choices(comparisons, k=length - 1)]
     left, *comparators = [make_node_expression(vctx, max_depth=max_depth - 1) for _ in range(length)]
+    while (type(left) == ast.Num):
+        left = make_node_expression(vctx, max_depth=max_depth-1)
     ret = ast.Compare(left, ops, comparators)
     return ret
