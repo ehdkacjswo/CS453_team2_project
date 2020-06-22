@@ -463,4 +463,8 @@ class TestGenerator:
                 rt[-1].append(time.time() - time_start)
 
         # [generation, passed branch/total_branch (%), time (s)]
-        return rt
+        return [{
+            'generation': elem[0],
+            'coverage': elem[1],
+            'time': elem[2]
+        } for elem in rt]
