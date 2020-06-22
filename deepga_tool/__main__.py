@@ -6,40 +6,30 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('py_file', type=str, help='Input python function file')
     parser.add_argument(
-        '--p', type=int, help='Number of population', default=100)
+        '--p', type=int, help='Number of population')
     parser.add_argument('--gen', type=int,
-                        help='Number of generation', default=100)
+                        help='Number of generation')
     parser.add_argument(
-        '--pm', type=int, help='Probability of mutation in percentage', default=20)
-    parser.add_argument(
-        '--ps', type=int, help='Percentage of population saved <= 50', default=10)
-    parser.add_argument('--alpha', type=int,
-                        help='Alpha of gamma distribution', default=1)
-    parser.add_argument('--beta', type=int,
-                        help='Beta of gamma distribution', default=1)
-    parser.add_argument(
-        '--func', type=str, help='Name of revised python file', default='branch_dist_print')
-    parser.add_argument(
-        '--br', type=str, help='Name of branch distance file', default='br_dist')
+        '--pm', type=int, help='Probability of mutation in percentage')
 
     # Arguments for our deep learning framework
     parser.add_argument('--niter', type=int,
-                        help="Number of iteration to be optimized", default=1000)
+                        help="Number of iteration to be optimized")
     parser.add_argument('--lr', type=float,
-                        help="Learning for optimizer", default=1e-3)
+                        help="Learning for optimizer")
     parser.add_argument('--no_cuda', action='store_true',
-                        default=False, help='disables CUDA training')
+                        help='disables CUDA training')
     parser.add_argument('--step_size', type=float,
-                        help="Step size for guided gradient descent", default=1e6)
-    parser.add_argument('--seed', type=int, help='random seed', default=2)
+                        help="Step size for guided gradient descent")
+    parser.add_argument('--seed', type=int, help='random seed')
     parser.add_argument(
-        '--model-dir', help='model save directory', default='./ckpt')
+        '--model-dir', help='model save directory')
 
     args = parser.parse_args()
     test_generator = TestGenerator(
-        args.p, args.gen, args.pm,
-        args.niter, args.lr, args.no_cuda,
-        args.step_size, args.seed, args.model_dir
+        p=args.p, gen=args.gen, pm_percent=args.pm,
+        niter=args.niter, lr=args.lr, no_cuda=args.no_cuda,
+        step_size=args.step_size, seed=args.seed, model_dir=args.model_dir
     )
 
     # Experiment with dnn or not

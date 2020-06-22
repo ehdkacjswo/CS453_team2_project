@@ -21,31 +21,36 @@ import torch.optim as optim
 
 
 class TestGenerator:
-    def __init__(self,
-                 p, gen, pm_percent,
-                 niter, lr, no_cuda, step_size, seed, model_dir):
-        self.p = p
-        self.save_p = int(math.floor(p * 0.1))
-        self.gen = gen
+    def __init__(self, **opt_args):
+        self.p = 100
+        self.gen = 100
+        self.pm_percent = 20
+        self.niter = 1000
+        self.step_size = 1e6
+        self.lr = 1e-3
+        self.no_cuda = False
+        self.seed = 2
+        self.model_dir = './ckpt'
+
+        # Accept arg if exist.
+        for opt_k, opt_v in opt_args.items():
+            if opt_v is not None and opt_k in dir(self):
+                setattr(self, opt_k, opt_v)
+
+        # Setting with given args.
+        self.save_p = int(math.floor(self.p * 0.1))
+
+        use_cuda = not self.no_cuda and torch.cuda.is_available()
+        device = torch.device("cuda" if use_cuda else "cpu")
+
+        self.args = self.Args(self.pm_percent / 100.0, 1, 1, device, self.step_size, self.niter)
 
         self.func_file = 'branch_dist_print'
         self.br_file = 'br_dist'
 
-        use_cuda = torch.cuda.is_available()
-        device = torch.device("cuda" if use_cuda else "cpu")
-
-        self.niter = niter
-        self.step_size = step_size
-        self.lr = lr
-        self.no_cuda = no_cuda
-        self.seed = seed
-        self.model_dir = model_dir
-
-        self.args = self.Args(pm_percent / 100.0, 1, 1, device, step_size, niter)
-
-        rand.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
+        rand.seed(self.seed)
+        torch.manual_seed(self.seed)
+        torch.cuda.manual_seed_all(self.seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
@@ -457,5 +462,5 @@ class TestGenerator:
                                          test_file_name, self.func_file + str(ind) + '.py'))
                 rt[-1].append(time.time() - time_start)
 
-        # [generation, total branch, passed branch, time]
+        # [generation, passed branch/total_branch (%), time (s)]
         return rt
