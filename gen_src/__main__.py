@@ -9,7 +9,7 @@ Reference : https://github.com/radomirbosak/random-ast.git
 '''
 
 def src_gen():
-    fun_def = make_node_function_def(max_depth=4, num_body_statements=4)
+    fun_def = make_node_function_def(max_depth=3, num_body_statements=4)
     expr = ast.Module(body=[fun_def])
     src = astor.code_gen.to_source(expr)
     return src
