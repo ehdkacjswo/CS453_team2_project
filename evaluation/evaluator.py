@@ -61,7 +61,7 @@ class Evaluator:
             os.mkdir(genned_src_dir)
 
         self.gen_count = 0
-        self.test_generator = TestGenerator()  # Default settings.
+        self.test_generator = TestGenerator(p=30, gen=50, niter=300)  # Default settings.
 
         self.dnn_approx_result = self.Result()
         self.dnn_result = self.Result()
@@ -73,10 +73,12 @@ class Evaluator:
             self.test_generator.set_seed(seed)
             self.dnn_approx_result.store_result(target_file_path, seed,
                     self.test_generator.test_file(target_file_path, True, True))
+            self.test_generator_dnn = TestGenerator(p=30, gen=50, niter=300)  # Default settings.
             self.dnn_result.store_result(target_file_path, seed,
-                    self.test_generator.test_file(target_file_path, True, False))
+                    self.test_generator_dnn.test_file(target_file_path, True, False))
+            self.test_generator_vanila = TestGenerator(p=30, gen=50, niter=300)  # Default settings.
             self.vanila_result.store_result(target_file_path, seed,
-                    self.test_generator.test_file(target_file_path, False, False))
+                    self.test_generator_vanila.test_file(target_file_path, False, False))
 
     def eval_with_gen_src(self):
         genned_src = generate()
