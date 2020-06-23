@@ -24,9 +24,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--file_name', type=str, help='File name in manual_src to run.', default=None)
     parser.add_argument('-g', '--gen_src_count', type=int, help='Number of automatically generated source to run.', default=0)
+    parser.add_argument('-n', '--num_seeds', type=int, help='Number of seeds that will run per source file.', default=2)
     args = parser.parse_args()
 
-    seeds = [10 * s for s in range(2)]
+    seeds = [10 * s for s in range(args.num_seeds)]
     evaluator = Evaluator(seeds, 'evaluation/manual_src', 'evaluation/__genned')
 
     if args.file_name is not None:
