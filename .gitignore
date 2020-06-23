@@ -1,0 +1,6 @@
+.DS_Store
+__pycache__/
+sftp-config.json
+build
+*.egg-info
+evaluation/__genned
