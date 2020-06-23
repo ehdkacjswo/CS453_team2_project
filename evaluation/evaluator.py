@@ -78,7 +78,6 @@ class Evaluator:
             self.vanila_result.store_result(target_file_path, seed,
                     self.test_generator.test_file(target_file_path, False, False))
 
-
     def eval_with_gen_src(self):
         genned_src = generate()
 

@@ -316,7 +316,7 @@ class TestGenerator:
 
             if self.args.use_dnn:
                 self.args.model = MLP(arg_num).to(self.args.device)
-                self.args.opt = optim.Adam(self.args.model.parameters(), lr=1e-3)
+                self.args.opt = optim.Adam(self.args.model.parameters(), lr=self.lr)
 
             new_test = self.gen_input(arg_num, special)
             output, sol_found = self.test(new_test, leaf_ind)
