@@ -61,24 +61,22 @@ class Evaluator:
             os.mkdir(genned_src_dir)
 
         self.gen_count = 0
-        self.test_generator = TestGenerator(p=30, gen=50, niter=300)  # Default settings.
 
         self.dnn_approx_result = self.Result()
         self.dnn_result = self.Result()
         self.vanila_result = self.Result()
 
-    def _run_test_generator(self, target_file_path):
+    def _run_test_generator(self, target_file_path, seed, use_dnn, use_approx):
+        test_generator = TestGenerator(p=30, gen=50, niter=300, seed=seed)
+        return test_generator.test_file(target_file_path, use_dnn, use_approx)
+
+    def _run_test_file(self, target_file_path):
         for seed in self.seeds:
             print(target_file_path, seed)
-            self.test_generator.set_seed(seed)
-            self.dnn_approx_result.store_result(target_file_path, seed,
-                    self.test_generator.test_file(target_file_path, True, True))
-            self.test_generator_dnn = TestGenerator(p=30, gen=50, niter=300)  # Default settings.
-            self.dnn_result.store_result(target_file_path, seed,
-                    self.test_generator_dnn.test_file(target_file_path, True, False))
-            self.test_generator_vanila = TestGenerator(p=30, gen=50, niter=300)  # Default settings.
-            self.vanila_result.store_result(target_file_path, seed,
-                    self.test_generator_vanila.test_file(target_file_path, False, False))
+
+            self.dnn_approx_result.store_result(target_file_path, seed, self._run_test_generator(target_file_path, seed, True, True))
+            self.dnn_result.store_result(target_file_path, seed, self._run_test_generator(target_file_path, seed, True, False))
+            self.vanila_result.store_result(target_file_path, seed, self._run_test_generator(target_file_path, seed, False, False))
 
     def eval_with_gen_src(self):
         genned_src = generate()
@@ -88,16 +86,16 @@ class Evaluator:
 
         with open(genned_file_path, 'w') as genned_file:
             genned_file.write(genned_src)
-        self._run_test_generator(genned_file_path)
+        self._run_test_file(genned_file_path)
 
     def eval_with_manual_src_all(self):
         manual_src_py_files = os.path.join(self.manual_src_dir, '*.py')
         for manual_path in [os.path.join(self.manual_src_dir, os.path.basename(whole_path)) for whole_path in glob.glob(manual_src_py_files)]:
-            self._run_test_generator(manual_path)
+            self._run_test_file(manual_path)
 
     def eval_with_manual_src_file(self, file_name):
         manual_path = os.path.join(self.manual_src_dir, file_name)
-        self._run_test_generator(manual_path)
+        self._run_test_file(manual_path)
 
     def get_all_results(self):
         self.dnn_approx_result.calc_seed_avg()

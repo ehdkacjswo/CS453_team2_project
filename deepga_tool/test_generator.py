@@ -50,16 +50,12 @@ class TestGenerator:
 
         self.func_file = 'branch_dist_print'
         self.br_file = 'br_dist'
-
-        self.set_seed(self.seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-
-    def set_seed(self, seed):
-        self.seed = seed
+        
         rand.seed(self.seed)
         torch.manual_seed(self.seed)
         torch.cuda.manual_seed_all(self.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
     # Class contains arguments for other functions
     class Args:
