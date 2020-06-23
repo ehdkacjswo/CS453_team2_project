@@ -29,17 +29,17 @@ class Evaluator:
         generation = 0
         coverage = 0
         elapsed_time = 0
+
         for file_rt in result.values():
             for fun_rt in file_rt:
-                generation += fun_rt['generation']
+                generation += fun_rt['execution']
                 coverage += fun_rt['coverage']
                 elapsed_time += fun_rt['elapsed_time']
         return {
-            'generation': generation / len(result),
+            'execution': generation / len(result),
             'coverage': coverage / len(result),
             'elapsed_time': elapsed_time / len(result),
         }
-
 
     def eval_with_gen_src(self):
         genned_src = generate()

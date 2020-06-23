@@ -309,7 +309,7 @@ class TestGenerator:
 
             if self.args.use_dnn:
                 self.args.model = MLP(arg_num).to(self.args.device)
-                self.args.opt = optim.Adam(self.args.model.parameters(), lr=1e-3)
+                self.args.opt = optim.Adam(self.args.model.parameters(), lr=self.lr)
 
             new_test = self.gen_input(arg_num, special)
             output, sol_found = self.test(new_test, leaf_ind)
@@ -459,7 +459,7 @@ class TestGenerator:
 
         # [generation, passed branch/total_branch (%), time (s)]
         return [{
-            'generation': elem[0],
+            'execution': elem[0],
             'coverage': elem[1],
             'elapsed_time': elem[2]
         } for elem in rt]
