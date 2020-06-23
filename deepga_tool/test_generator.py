@@ -6,6 +6,7 @@ import copy
 import math
 import time
 import importlib
+import collections
 import random as rand
 from deepga_tool.ast_helper import find_num, find_if, name_len, branch
 
@@ -21,6 +22,8 @@ import torch.optim as optim
 
 
 class TestGenerator:
+    FuncResult = collections.namedtuple('FuncResult', 'generation coverage elasped_time')
+    
     def __init__(self, **opt_args):
         self.p = 100
         self.gen = 100
@@ -48,11 +51,15 @@ class TestGenerator:
         self.func_file = 'branch_dist_print'
         self.br_file = 'br_dist'
 
+        self.set_seed(self.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+    def set_seed(self, seed):
+        self.seed = seed
         rand.seed(self.seed)
         torch.manual_seed(self.seed)
         torch.cuda.manual_seed_all(self.seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
 
     # Class contains arguments for other functions
     class Args:
@@ -403,6 +410,7 @@ class TestGenerator:
                         self.args.step_size = self.step_size
 
         rt = []
+        rt.append(func_name)
         rt.append(num_exe)
         
         # Set of braches coverd
@@ -457,9 +465,8 @@ class TestGenerator:
                                          test_file_name, self.func_file + str(ind) + '.py'))
                 rt[-1].append(time.time() - time_start)
 
-        # [generation, passed branch/total_branch (%), time (s)]
-        return [{
-            'generation': elem[0],
-            'coverage': elem[1],
-            'elapsed_time': elem[2]
-        } for elem in rt]
+        # fun_rt : [func_name, generation, passed branch/total_branch (%), time (s)]
+        total_result = {}
+        for fun_rt in rt:
+            total_result[fun_rt[0]] = self.FuncResult(*fun_rt[1:])
+        return total_result

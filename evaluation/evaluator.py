@@ -5,8 +5,56 @@ from evaluation.gen_src.gen import generate
 from deepga_tool.test_generator import TestGenerator
 
 class Evaluator:
-    def __init__(self, run_per_file, manual_src_dir, genned_src_dir):
-        self.run_per_file = run_per_file
+    class Result:
+        def __init__(self):
+            self.filefunc_result = {}
+
+        def store_result(self, target_file_path, seed, test_generator_result):
+            for func_name, func_result in test_generator_result.items():
+                filefunc = '{}_{}'.format(target_file_path, func_name)
+                if filefunc not in self.filefunc_result:
+                    self.filefunc_result[filefunc] = {}
+                self.filefunc_result[filefunc][seed] = func_result
+
+        def calc_seed_avg(self):
+            for filefunc, result in self.filefunc_result.items():
+                seed_count = len(result)
+                generation_avg = 0
+                coverage_avg = 0
+                elasped_time_avg = 0
+
+                for seed, func_result in result.items():
+                    generation_avg += func_result.generation
+                    coverage_avg += func_result.coverage
+                    elasped_time_avg += func_result.elasped_time
+
+                generation_avg /= seed_count
+                coverage_avg /= seed_count
+                elasped_time_avg /= seed_count
+
+                self.filefunc_result[filefunc]['avg'] = TestGenerator.FuncResult(
+                        generation_avg, coverage_avg, elasped_time_avg)
+
+        # This is valid since #seeds is always uniform for single Evaluator object.
+        def calc_all_avg(self):
+            generation_avg = 0
+            coverage_avg = 0
+            elasped_time_avg = 0
+            all_count = len(self.filefunc_result)
+
+            for filefunc, result in self.filefunc_result.items():
+                generation_avg += result['avg'].generation
+                coverage_avg += result['avg'].coverage
+                elasped_time_avg += result['avg'].elasped_time
+
+            generation_avg /= all_count
+            coverage_avg /= all_count
+            elasped_time_avg /= all_count
+
+            return TestGenerator.FuncResult(generation_avg, coverage_avg, elasped_time_avg)
+
+    def __init__(self, seeds, manual_src_dir, genned_src_dir):
+        self.seeds = seeds
         self.manual_src_dir = manual_src_dir
         self.genned_src_dir = genned_src_dir
         if not os.path.isdir(self.genned_src_dir):
@@ -15,30 +63,20 @@ class Evaluator:
         self.gen_count = 0
         self.test_generator = TestGenerator()  # Default settings.
 
-        self.dnn_approx_result = {}
-        self.dnn_result = {}
-        self.vanila_result = {}
+        self.dnn_approx_result = self.Result()
+        self.dnn_result = self.Result()
+        self.vanila_result = self.Result()
 
     def _run_test_generator(self, target_file_path):
-        self.dnn_approx_result[target_file_path] = self.test_generator.test_file(target_file_path, True, True)
-        self.dnn_result[target_file_path] = self.test_generator.test_file(target_file_path, True, False)
-        self.vanila_result[target_file_path] = self.test_generator.test_file(target_file_path, False, False)
-
-    @staticmethod
-    def _calc_avg(result):
-        generation = 0
-        coverage = 0
-        elapsed_time = 0
-        for file_rt in result.values():
-            for fun_rt in file_rt:
-                generation += fun_rt['generation']
-                coverage += fun_rt['coverage']
-                elapsed_time += fun_rt['elapsed_time']
-        return {
-            'generation': generation / len(result),
-            'coverage': coverage / len(result),
-            'elapsed_time': elapsed_time / len(result),
-        }
+        for seed in self.seeds:
+            print(target_file_path, seed)
+            self.test_generator.set_seed(seed)
+            self.dnn_approx_result.store_result(target_file_path, seed,
+                    self.test_generator.test_file(target_file_path, True, True))
+            self.dnn_result.store_result(target_file_path, seed,
+                    self.test_generator.test_file(target_file_path, True, False))
+            self.vanila_result.store_result(target_file_path, seed,
+                    self.test_generator.test_file(target_file_path, False, False))
 
 
     def eval_with_gen_src(self):
@@ -61,7 +99,12 @@ class Evaluator:
         self._run_test_generator(manual_path)
 
     def get_all_results(self):
+        self.dnn_approx_result.calc_seed_avg()
+        self.dnn_result.calc_seed_avg()
+        self.vanila_result.calc_seed_avg()
         return self.dnn_approx_result, self.dnn_result, self.vanila_result
 
-    def get_avg_results(self):
-        return self._calc_avg(self.dnn_approx_result), self._calc_avg(self.dnn_result), self._calc_avg(self.vanila_result)
+    def get_all_avg_results(self):
+        return (self.dnn_approx_result.calc_all_avg(),
+                self.dnn_result.calc_all_avg(),
+                self.vanila_result.calc_all_avg())
