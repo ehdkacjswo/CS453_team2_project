@@ -2,8 +2,8 @@ import ast
 import astor
 import random
 
-from gen_src.variable import make_node_rhs_variable, make_node_lhs_variable
-from gen_src.literal import make_node_literal
+from evaluation.gen_src.variable import make_node_rhs_variable, make_node_lhs_variable
+from evaluation.gen_src.literal import make_node_literal
 
 binary_ops = [
     ast.Add,
@@ -15,14 +15,14 @@ binary_ops = [
 ]
 bool_ops = [ast.Or, ast.And]
 comparisons = [
-    ast.Eq,
-    ast.NotEq,
+    # ast.Eq,
+    # ast.NotEq,
     ast.Lt,
     ast.LtE,
     ast.Gt,
     ast.GtE,
-    ast.Is,
-    ast.IsNot,
+    # ast.Is,
+    # ast.IsNot,
 ]
 
 
@@ -41,7 +41,7 @@ def make_node_expression(vctx, max_depth=None, numeric=False, isbool=False):
         ]
         if not numeric:
             choices += [
-                make_node_bool_op,
+                # make_node_bool_op,
                 make_node_comparison,
             ]
     if isbool:
@@ -54,7 +54,7 @@ def make_node_expression(vctx, max_depth=None, numeric=False, isbool=False):
 
 def make_node_test_expression(vctx, max_depth=None):
     choices = [
-        make_node_bool_op,
+        # make_node_bool_op,
         make_node_comparison,
         make_node_comparison
     ]
@@ -78,11 +78,16 @@ def make_node_bool_op(vctx, max_depth=None):
 
 
 def make_node_comparison(vctx, max_depth=None):
-    length = 2
+    assert(len(vctx) > 0)
+    
+    op = random.choice(comparisons)()
+    while True:
+        left = make_node_expression(vctx, max_depth=max_depth - 1)
+        if type(left) is not ast.Num:
+            break
+    while True:
+        comparator = make_node_expression(vctx, max_depth=max_depth - 1)
+        if not (type(left) is ast.Name and type(comparator) is ast.Name and left.id == comparator.id):
+            break
 
-    ops = [op() for op in random.choices(comparisons, k=length - 1)]
-    left, *comparators = [make_node_expression(vctx, max_depth=max_depth - 1) for _ in range(length)]
-    while (type(left) == ast.Num):
-        left = make_node_expression(vctx, max_depth=max_depth-1)
-    ret = ast.Compare(left, ops, comparators)
-    return ret
+    return ast.Compare(left, [op], [comparator])
