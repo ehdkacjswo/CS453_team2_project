@@ -160,6 +160,7 @@ class TestGenerator:
                 if new_output[-1][1][sub_leaf_ind] < 0:
                     del self.leaf_index[sub_leaf_ind]
                     self.add_dist_pop([new_output[-1]])
+                    print(sub_leaf_ind, new_output[-1])
 
                     if sub_leaf_ind == leaf_ind:
                         return new_output, True
