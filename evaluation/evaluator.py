@@ -19,39 +19,39 @@ class Evaluator:
         def calc_seed_avg(self):
             for filefunc, result in self.filefunc_result.items():
                 seed_count = len(result)
-                generation_avg = 0
+                num_exec_avg = 0
                 coverage_avg = 0
                 elasped_time_avg = 0
 
                 for seed, func_result in result.items():
-                    generation_avg += func_result.generation
+                    num_exec_avg += func_result.num_exec
                     coverage_avg += func_result.coverage
                     elasped_time_avg += func_result.elasped_time
 
-                generation_avg /= seed_count
+                num_exec_avg /= seed_count
                 coverage_avg /= seed_count
                 elasped_time_avg /= seed_count
 
                 self.filefunc_result[filefunc]['avg'] = TestGenerator.FuncResult(
-                        generation_avg, coverage_avg, elasped_time_avg)
+                        num_exec_avg, coverage_avg, elasped_time_avg)
 
         # This is valid since #seeds is always uniform for single Evaluator object.
         def calc_all_avg(self):
-            generation_avg = 0
+            num_exec_avg = 0
             coverage_avg = 0
             elasped_time_avg = 0
             all_count = len(self.filefunc_result)
 
             for filefunc, result in self.filefunc_result.items():
-                generation_avg += result['avg'].generation
+                num_exec_avg += result['avg'].num_exec
                 coverage_avg += result['avg'].coverage
                 elasped_time_avg += result['avg'].elasped_time
 
-            generation_avg /= all_count
+            num_exec_avg /= all_count
             coverage_avg /= all_count
             elasped_time_avg /= all_count
 
-            return TestGenerator.FuncResult(generation_avg, coverage_avg, elasped_time_avg)
+            return TestGenerator.FuncResult(num_exec_avg, coverage_avg, elasped_time_avg)
 
     def __init__(self, seeds, manual_src_dir, genned_src_dir):
         self.seeds = seeds

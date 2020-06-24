@@ -5,6 +5,8 @@ from deepga_tool.test_generator import TestGenerator
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('py_file', type=str, help='Input python function file')
+    parser.add_argument('--method', type=str, choices=['dnn_approx', 'dnn', 'vanila'], default='dnn_approx',
+                        help='Type of GA method to use for test generation.')
     parser.add_argument(
         '--p', type=int, help='Number of population')
     parser.add_argument('--gen', type=int,
@@ -29,18 +31,22 @@ def main():
     test_generator = TestGenerator(
         p=args.p, gen=args.gen, pm_percent=args.pm,
         niter=args.niter, lr=args.lr, no_cuda=args.no_cuda,
-        step_size=args.step_size, seed=args.seed, model_dir=args.model_dir
+        step_size=args.step_size, seed=args.seed, model_dir=args.model_dir,
+        print_test=True
     )
 
-    # Experiment with dnn or not
-    print('testing with dnn and approx')
-    print(test_generator.test_file(args.py_file, True, True), '\n')
-    
-    print('testing with dnn and no approx')
-    print(test_generator.test_file(args.py_file, True, False), '\n')
+    if args.method == 'dnn_approx':
+        use_dnn = True
+        use_approx = True
+    elif args.method == 'dnn':
+        use_dnn = True
+        use_approx = False
+    else:
+        use_dnn = False
+        use_approx = False
 
-    print('testing without dnn')
-    print(test_generator.test_file(args.py_file, False, False))
+    func_result = test_generator.test_file(args.py_file, use_dnn, use_approx)
+    print(func_result)
 
 
 if __name__ == "__main__":

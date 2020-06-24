@@ -22,9 +22,10 @@ import torch.optim as optim
 
 
 class TestGenerator:
-    FuncResult = collections.namedtuple('FuncResult', 'generation coverage elasped_time')
+    FuncResult = collections.namedtuple('FuncResult', 'num_exec coverage elasped_time')
     
     def __init__(self, **opt_args):
+        self.print_test = False
         self.p = 100
         self.gen = 100
         self.pm_percent = 20
@@ -50,7 +51,7 @@ class TestGenerator:
 
         self.func_file = 'branch_dist_print'
         self.br_file = 'br_dist'
-        
+
         rand.seed(self.seed)
         torch.manual_seed(self.seed)
         torch.cuda.manual_seed_all(self.seed)
@@ -160,7 +161,11 @@ class TestGenerator:
                 if new_output[-1][1][sub_leaf_ind] < 0:
                     del self.leaf_index[sub_leaf_ind]
                     self.add_dist_pop([new_output[-1]])
-                    print(sub_leaf_ind, new_output[-1])
+                    if self.print_test:
+                        print('{}{} : {}'.format(
+                                abs(sub_leaf_ind),
+                                'T' if sub_leaf_ind > 0 else 'F',
+                                new_output[-1][0]))
 
                     if sub_leaf_ind == leaf_ind:
                         return new_output, True
@@ -462,7 +467,7 @@ class TestGenerator:
                                          test_file_name, self.func_file + str(ind) + '.py'))
                 rt[-1].append(time.time() - time_start)
 
-        # fun_rt : [func_name, generation, passed branch/total_branch (%), time (s)]
+        # fun_rt : [func_name, num_exec, passed branch/total_branch (%), time (s)]
         total_result = {}
         for fun_rt in rt:
             total_result[fun_rt[0]] = self.FuncResult(*fun_rt[1:])
