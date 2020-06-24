@@ -1,17 +1,8 @@
-<p align="center">
-    <p align="center">
-    <font size="20">
-        DeepGA
-    </font>
-    </p>
-    <p align="center">
-        Search-based test case generation, using genetic algorithm enhanced by deep neural networks
-        <br />
-        Team project for CS453 Automated Software Testing, Spring 2020, KAIST
-    </p>
-</p>
+# DeepGA
+Search-based test case generation, using genetic algorithm enhanced by deep neural networks  
+Team project for CS453 Automated Software Testing, Spring 2020, KAIST
 
-# About
+## About
 DeepGA is a search-based test case generation program which automatically generates test cases of python program, aiming for high branch coverage.  
 Searching strategy is based on enhanced genetic algorithm (GA), intriguing properties of deep neural networks (DNN).  
 We improved vanila GA by training and inferencing DNN simultaneously, using following approaches:
@@ -19,7 +10,7 @@ We improved vanila GA by training and inferencing DNN simultaneously, using foll
 We approximated the fitness function calculation with DNN inference. This can reduce number of execution of program required for searching, thus can be benefitial when the target program is expensive to execute.
 - **guided mutation using gradient descent.**
 When generating next population, we substracted the current gradient of DNN, which guarantees that the population is improved if the DNN is perfectly approximating the fitness function.
-# Structure
+## Structure
 DeepGA project consists of two parts.
 - `deepga_tool` : a main tool module that gives generated test case (target function arguments for testing) that achieves coverage for each leaf branches.
 - `evaluation` : a module for evaluating the performance of main tool. It includes a submodule, `gen_src`, a context-aware random python source generator that generates sources with no undefined reference error and satisfies source acceptable range of our main tool.
@@ -28,7 +19,7 @@ DeepGA project consists of two parts.
 └── evaluation
     └── gen_src
 ```
-# Usage
+## Usage
 Following commands should be done at the root directory of the project.  
 First, install dependencies.
 ```
